@@ -18,7 +18,7 @@ class TelegramClient:
     Garante: persistir update_id ANTES de confirmar offset no Telegram.
     """
 
-    def __init__(self, token: str, storage: Storage, timeout: int = 30):
+    def __init__(self, token: str, storage: Storage, timeout: int = 10):
         self.token = token
         self.storage = storage
         self.timeout = timeout

@@ -267,6 +267,9 @@ class PanelHandler(BaseHTTPRequestHandler):
             self.send_response(code)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("X-Frame-Options", "DENY")
+            self.send_header("Referrer-Policy", "no-referrer")
             self.end_headers()
             self.wfile.write(body)
         except (BrokenPipeError, ConnectionResetError):
@@ -320,7 +323,7 @@ class PanelHandler(BaseHTTPRequestHandler):
                 sel_chat_id = None
         chats = self._known_chats()
 
-        if path == "/painel/":
+        if path == "/painel":
             self._send_html(200, _page("Visão geral", self._overview_html(), "overview", sel_chat_id, chats))
         elif path == "/painel/rankings":
             self._send_html(200, _page("Rankings", self._rankings_html(qs), "rankings", sel_chat_id, chats))
@@ -380,6 +383,10 @@ class PanelHandler(BaseHTTPRequestHandler):
             self._config_resetar(body_params, is_owner)
         elif path == "/painel/exportar/gerar":
             self._exportar_gerar(body_params)
+        elif path == "/painel/exportar/importar":
+            self._exportar_importar()
+        elif path == "/painel/auditoria/limpar":
+            self._auditoria_limpar()
         elif path == "/painel/sessao/encerrar":
             self._sessao_encerrar(qs)
         else:
@@ -445,15 +452,40 @@ class PanelHandler(BaseHTTPRequestHandler):
         storage = self.app.storage
         total_msgs = storage.fetchone("SELECT COUNT(*) as c FROM ranking_messages")["c"]
         total_pts = storage.fetchone("SELECT COUNT(*) as c FROM ranking_points")["c"]
+        total_users = storage.fetchone("SELECT COUNT(DISTINCT user_id) as c FROM ranking_messages")["c"]
         rounds = storage.fetchall("SELECT week_start, state FROM ranking_rounds ORDER BY week_start DESC LIMIT 5")
         rounds_html = "".join(
             f"<tr><td>{r['week_start']}</td><td><span class='badge {'ok' if r['state']=='closed' else 'warn'}'>{r['state']}</span></td></tr>"
             for r in rounds
         )
+        chats = self._known_chats()
+        groups_html = ""
+        if chats:
+            group_rows = []
+            for c in chats:
+                cid = c["id"]
+                gm = storage.fetchone(
+                    "SELECT COUNT(*) as c FROM ranking_messages WHERE chat_id = ?", (cid,)
+                )["c"]
+                gp = storage.fetchone(
+                    "SELECT COUNT(*) as c FROM ranking_points WHERE chat_id = ?", (cid,)
+                )["c"]
+                group_rows.append([c.get("title") or f"Chat {cid}", cid, c.get("member_count", "?"), gm, gp])
+            groups_html = _table(
+                ["Grupo", "Chat ID", "Membros", "Mensagens", "Pontos"],
+                group_rows,
+                total=len(group_rows),
+            )
+        mods = self.app.modules.list_enabled()
+        mod_rows = [[m.module_id, m.version, "Ativo" if m.enabled else "Inativo", ", ".join(c.name for c in m.commands)] for m in mods]
+        mod_html = _table(["ID", "Versão", "Estado", "Comandos"], mod_rows, total=len(mod_rows)) if mods else "<p class='small'>Nenhum módulo carregado.</p>"
+
         return f"""
         <div class="grid2">
           <div class="stat"><div class="v">{total_msgs}</div><div class="l">Mensagens armazenadas</div></div>
           <div class="stat"><div class="v">{total_pts}</div><div class="l">Lançamentos de pontos</div></div>
+          <div class="stat"><div class="v">{total_users}</div><div class="l">Usuários únicos</div></div>
+          <div class="stat"><div class="v">{len(chats)}</div><div class="l">Grupos monitorados</div></div>
           <div class="stat"><div class="v badge ok">Online</div><div class="l">Bot em execução</div></div>
           <div class="stat"><div class="v">http://127.0.0.1:{self.app.config.get('WEB_PORT',2020)}/painel/</div><div class="l">Painel (localhost)</div></div>
         </div>
@@ -465,9 +497,12 @@ class PanelHandler(BaseHTTPRequestHandler):
           </table>
         </div>
         <div class="card">
-          <h2>Grupo monitorado</h2>
-          <p>NewsInside Chat — <code>-1002267119439</code></p>
-          <p class="small">O painel exibe dados deste grupo. Outros grupos podem ser adicionados pelo bot.</p>
+          <h2>Grupos monitorados</h2>
+          {groups_html or '<p class="small">Nenhum grupo encontrado.</p>'}
+        </div>
+        <div class="card">
+          <h2>Módulos instalados</h2>
+          {mod_html}
         </div>"""
 
     def _rankings_html(self, qs) -> str:
@@ -634,15 +669,47 @@ class PanelHandler(BaseHTTPRequestHandler):
             </div>
             <button class="btn primary" type="submit">Gerar snapshot desta semana</button>
           </form>
+        </div>
+        <div class="card">
+          <h2>Importar backup</h2>
+          <p class="small">Envie um arquivo JSON de snapshot gerado anteriormente para restaurar os dados do ranking.</p>
+          <form method="POST" action="/painel/exportar/importar" enctype="multipart/form-data" style="margin-top:1rem">
+            <input type="hidden" name="csrf" value="{escape(self._csrf_token() or '')}">
+            <div class="form-group">
+              <label>Arquivo de backup</label>
+              <input name="backup_file" type="file" accept=".json" required>
+            </div>
+            <button class="btn primary" type="submit">Importar backup</button>
+          </form>
         </div>"""
 
     def _auditoria_html(self, qs) -> str:
-        rows = self.app.storage.fetchall("SELECT id, actor_id, action, params, result, created_at FROM audit_log ORDER BY created_at DESC LIMIT 50")
+        storage = self.app.storage
+        rows = storage.fetchall("SELECT id, actor_id, action, params, result, created_at FROM audit_log ORDER BY created_at DESC LIMIT 100")
         data = [[r["id"], r["actor_id"], r["action"], r["params"] or "", r["result"] or "", r["created_at"]] for r in rows]
+        # estatisticas de auditoria
+        stats = storage.fetchall("SELECT action, COUNT(*) as qtd FROM audit_log GROUP BY action ORDER BY qtd DESC")
+        stat_rows = [[s["action"], s["qtd"]] for s in stats]
+        csrf = self._csrf_token() or ""
         return f"""
+        <div class="grid2">
+          <div class="stat"><div class="v">{len(data)}</div><div class="l">Entradas de auditoria</div></div>
+          <div class="stat"><div class="v">{len(stats)}</div><div class="l">Tipos de ação</div></div>
+        </div>
         <div class="card">
-          <h2>Log de auditoria</h2>
-          {_table(["ID", "Ator (ID)", "Ação", "Parâmetros", "Resultado", "Em"], data, total=len(data))}
+          <h2>Ações por tipo</h2>
+          {_table(["Ação", "Quantidade"], stat_rows, total=len(stat_rows)) if stat_rows else '<p class="small">Sem auditoria ainda.</p>'}
+        </div>
+        <div class="card">
+          <h2>Log de auditoria (últimas 100)</h2>
+          {_table(["ID", "Ator (ID)", "Ação", "Parâmetros", "Resultado", "Em"], data, total=len(data)) if data else '<p class="small">Sem auditoria ainda.</p>'}
+        </div>
+        <div class="card">
+          <h2>Limpar auditoria</h2>
+          <form method="POST" action="/painel/auditoria/limpar" style="margin-top:1rem">
+            <input type="hidden" name="csrf" value="{escape(csrf)}">
+            <button class="btn danger" type="submit" onclick="return confirm('Tem certeza que deseja limpar todo o log de auditoria?')">Limpar log de auditoria</button>
+          </form>
         </div>"""
 
     def _config_html(self, qs, is_owner: bool) -> str:
@@ -704,6 +771,79 @@ class PanelHandler(BaseHTTPRequestHandler):
         tmp.write_text(_json.dumps(snapshot, ensure_ascii=False, indent=2), encoding="utf-8")
         tmp.replace(final)
         self._redirect("/painel/exportar")
+
+    def _exportar_importar(self) -> None:
+        import json as _json
+        content_type = self.headers.get("Content-Type", "")
+        if not content_type.startswith("multipart/form-data"):
+            self._send_html(400, _page("Erro", _alert("error", "Formato de requisicao invalido.")))
+            return
+        boundary = content_type.split("boundary=")[-1].strip()
+        length = int(self.headers.get("Content-Length", 0))
+        raw = self.rfile.read(length)
+        sep = b"--" + boundary.encode()
+        parts = raw.split(sep)
+        file_data = None
+        file_name = None
+        CRLF = b"\r\n"
+        for part in parts:
+            if b"Content-Disposition" not in part:
+                continue
+            if b'name="backup_file"' not in part:
+                continue
+            header, _, body = part.partition(CRLF + CRLF)
+            body = body.rstrip(CRLF + b"--")
+            for line in header.split(CRLF):
+                if b'filename="' in line:
+                    s = line.index(b'filename="') + 10
+                    e = line.index(b'"', s)
+                    file_name = line[s:e].decode("utf-8", errors="replace")
+            file_data = body
+        if not file_data or not file_name:
+            self._send_html(400, _page("Erro", _alert("error", "Nenhum arquivo enviado.")))
+            return
+        try:
+            snapshot = _json.loads(file_data.decode("utf-8"))
+        except Exception as e:
+            self._send_html(400, _page("Erro", _alert("error", f"Arquivo JSON invalido: {e}")))
+            return
+        if "top10" not in snapshot or "week_start" not in snapshot:
+            self._send_html(400, _page("Erro", _alert("error", "Estrutura de backup invalida.")))
+            return
+        chat_id = snapshot.get("chat_id", 0)
+        ws = snapshot.get("week_start", "")
+        storage = self.app.storage
+        imported = 0
+        with storage.transaction() as c:
+            for entry in snapshot["top10"]:
+                uid = entry.get("user_id")
+                pts = entry.get("points", 0)
+                if not uid:
+                    continue
+                c.execute(
+                    "INSERT OR IGNORE INTO ranking_messages (chat_id, message_id, user_id, username, first_name, text, is_reply, reply_to_user_id, is_forward, has_video, has_link, date_unix, received_at, processed) VALUES (?, 0, ?, ?, '', '', 0, NULL, 0, 0, 0, 0, ?, 1)",
+                    (chat_id, uid, entry.get("username", ""), entry.get("first_name", ""), time.time()),
+                )
+                c.execute(
+                    "INSERT INTO ranking_points (chat_id, user_id, message_id, week_start, points, reason, created_at) VALUES (?, ?, 0, ?, ?, 'importado_backup', ?)",
+                    (chat_id, uid, ws, pts, time.time()),
+                )
+                imported += 1
+        self._redirect(f"/painel/exportar?chat_id={chat_id}")
+        try:
+            with storage.transaction() as c:
+                c.execute(
+                    "INSERT INTO audit_log (actor_id, action, params, result, created_at) VALUES (?, ?, ?, ?, ?)",
+                    (int(self._current_user()) if self._current_user() and self._current_user().isdigit() else None, "import_backup", _json.dumps({"chat_id": chat_id, "week_start": ws, "imported": imported}), f"{imported} registros importados", time.time()),
+                )
+        except Exception:
+            pass
+
+    def _auditoria_limpar(self) -> None:
+        storage = self.app.storage
+        with storage.transaction() as c:
+            c.execute("DELETE FROM audit_log")
+        self._redirect("/painel/auditoria")
 
     def _sessao_encerrar(self, qs) -> None:
         self.send_response(302)
