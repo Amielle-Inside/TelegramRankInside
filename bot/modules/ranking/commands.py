@@ -148,16 +148,24 @@ def cmd_historico(app: RankingApp, user_id: Optional[int], chat_id: Optional[int
 def cmd_regras(app: RankingApp, user_id: Optional[int], chat_id: Optional[int],
                args: Optional[str], msg: dict) -> None:
     texto = (
-        "*Regras de pontuacao (semanal)*\n"
-        "• Texto proprio: +0.7\n"
+        "*RankingInside — como funciona*\n\n"
+        "*O que é:* minigame de participação semanal no grupo. Quem mais interage com mensagens próprias, respostas e vídeos sobe no top 10 da semana.\n\n"
+        "*Pontuação por mensagem:*\n"
+        "• Texto próprio (não resposta): +0.7\n"
         "• Resposta a outra pessoa: +1.1\n"
-        "• 3 msgs consecutivas texto: +0.9 total\n"
-        "• 4a msg consecutiva: -0.1\n"
-        "• Video com explicacao propria: +0.7\n"
-        "• Link sem comentario: -0.3\n"
+        "• 3 msgs consecutivas de texto: +0.9 total\n"
+        "• 4ª msg consecutiva e seguintes: -0.1 cada\n"
+        "• Vídeo com explicação própria: +0.7\n"
+        "• Link sem comentário: -0.3\n"
         "• 3 encaminhamentos consecutivos: -0.6\n"
-        "• Msg identica repetida em <=10 min: sem pontos positivos\n"
-        "• Top 3 tem rodizio por ciclo\n"
+        "• Mensagem idêntica repetida em <=10 min: sem pontos positivos\n\n"
+        "*Ciclo e pódio:*\n"
+        "• Cada semana é uma rodada. O top 3 da semana ganha pódio.\n"
+        "• O pódio tem rodízio por ciclo: quem já ficou no top 3 fica fora da elegibilidade até rodar todos.\n"
+        "• Use !rciclo para ver o ciclo atual e sua elegibilidade.\n\n"
+        "*Comandos (cooldown 5 min no grupo):*\n"
+        "!rank — Top 10 da semana | !pontos — Sua pontuação | !posicao — Sua posição\n"
+        "!historico — Rodadas anteriores | !regras — esta mensagem | !ajuda — lista de comandos\n"
     )
     app.telegram.send_message(chat_id, texto)
 
