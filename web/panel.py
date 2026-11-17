@@ -480,6 +480,32 @@ class PanelHandler(BaseHTTPRequestHandler):
         mod_rows = [[m.module_id, m.version, "Ativo" if m.enabled else "Inativo", ", ".join(c.name for c in m.commands)] for m in mods]
         mod_html = _table(["ID", "Versão", "Estado", "Comandos"], mod_rows, total=len(mod_rows)) if mods else "<p class='small'>Nenhum módulo carregado.</p>"
 
+        # ciclo ativo e termino estimado
+        cycle_row = storage.fetchone("SELECT cycle_id, started_at, participants FROM ranking_cycles WHERE state = 'active' ORDER BY started_at DESC LIMIT 1")
+        ciclo_html = ""
+        if cycle_row:
+            import json as _json
+            participantes = _json.loads(cycle_row["participants"] or "[]")
+            n = len(participantes) if participantes else 0
+            semanas = -(-n // 3) if n > 0 else 1
+            from datetime import datetime, timedelta, timezone as _tz
+            try:
+                inicio = datetime.fromisoformat(cycle_row["started_at"])
+            except Exception:
+                inicio = datetime.now(_tz(timedelta(hours=-3)))
+            if not inicio.tzinfo:
+                inicio = inicio.replace(tzinfo=_tz(timedelta(hours=-3)))
+            termino = inicio + timedelta(weeks=semanas)
+            ciclo_html = f"""
+        <div class="card">
+          <h2>Ciclo atual</h2>
+          <p><strong>ID:</strong> {escape(cycle_row['cycle_id'])}</p>
+          <p><strong>Iniciado em:</strong> {escape(cycle_row['started_at'])}</p>
+          <p><strong>Término estimado:</strong> {termino.strftime('%d/%m/%Y %H:%M')}</p>
+          <p><strong>Participantes elegíveis:</strong> {n}</p>
+          <p class="small">3 vagas de pódio por semana. Ciclo encerra quando todos passarem pelo top 3.</p>
+        </div>"""
+
         return f"""
         <div class="grid2">
           <div class="stat"><div class="v">{total_msgs}</div><div class="l">Mensagens armazenadas</div></div>
@@ -489,6 +515,7 @@ class PanelHandler(BaseHTTPRequestHandler):
           <div class="stat"><div class="v badge ok">Online</div><div class="l">Bot em execução</div></div>
           <div class="stat"><div class="v">http://127.0.0.1:{self.app.config.get('WEB_PORT',2020)}/painel/</div><div class="l">Painel (localhost)</div></div>
         </div>
+        {ciclo_html}
         <div class="card">
           <h2>Últimas rodadas</h2>
           <table>
