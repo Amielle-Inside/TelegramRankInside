@@ -3,11 +3,48 @@
 from __future__ import annotations
 
 from typing import Optional
+from datetime import datetime, timezone, timedelta
+
+try:
+    import zoneinfo
+except Exception:
+    zoneinfo = None
 
 from bot.core.app import RankingApp
 from bot.core.storage import Storage
 from bot.modules.ranking.storage import week_start_for
 import time
+
+
+def _tz():
+    if zoneinfo:
+        try:
+            return zoneinfo.ZoneInfo("America/Sao_Paulo")
+        except Exception:
+            pass
+    return timezone(timedelta(hours=-3))
+
+
+def _semana_termino(ws: str) -> str:
+    """Retorna 'DD/MM/YYYY HH:MM' do fim da semana (domingo 23:59 SP)."""
+    ano, mes, dia = (int(x) for x in ws.split("-"))
+    segunda = datetime(ano, mes, dia, tzinfo=_tz())
+    domingo = segunda + timedelta(days=6, hours=23, minutes=59)
+    return domingo.strftime("%d/%m/%Y %H:%M")
+
+
+def _ciclo_termino(started_at: str, participantes: list) -> str:
+    """Retorna 'DD/MM/YYYY HH:MM' do fim estimado do ciclo (3 pódios/semana)."""
+    try:
+        inicio = datetime.fromisoformat(started_at)
+    except Exception:
+        inicio = datetime.now(_tz())
+    if not inicio.tzinfo:
+        inicio = inicio.replace(tzinfo=_tz())
+    n = len(participantes) if participantes else 0
+    semanas = -(-n // 3) if n > 0 else 1  # ceil(n/3), min 1 semana
+    termino = inicio + timedelta(weeks=semanas)
+    return termino.strftime("%d/%m/%Y %H:%M")
 
 
 def _top10(storage: Storage, chat_id: int, week_start: str) -> list:
@@ -50,6 +87,7 @@ def _cycle_info(storage: Storage, chat_id: int) -> dict:
     return {
         "active": True,
         "cycle_id": row["cycle_id"],
+        "started_at": row["started_at"],
         "participants": participants,
         "podiums": podium_map,
     }
@@ -68,6 +106,7 @@ def cmd_rank(app: RankingApp, user_id: Optional[int], chat_id: Optional[int],
         lines.append(f"{i}. {nome} — {entry['points']} pts")
     if not top:
         lines.append("Nenhum ponto nesta semana ainda.")
+    lines.append(f"\nSemana termina em: {_semana_termino(ws)}")
     app.telegram.send_message(chat_id, "\n".join(lines))
 
 
@@ -80,10 +119,13 @@ def cmd_rciclo(app: RankingApp, user_id: Optional[int], chat_id: Optional[int],
     if not info.get("active"):
         app.telegram.send_message(chat_id, "Nenhum ciclo ativo no momento.")
         return
+    termino = _ciclo_termino(info.get("started_at", ""), info["participants"])
     lines = [f"*Ciclo:* `{info['cycle_id']}`"]
-    lines.append(f"Participantes elegiveis: {len(info['participants'])}")
+    lines.append(f"Iniciado em: {info.get('started_at', '—')}")
+    lines.append(f"Término estimado: {termino}")
+    lines.append(f"Participantes elegíveis: {len(info['participants'])}")
     if info["podiums"]:
-        lines.append("*Pódios ja conquistados neste ciclo:*")
+        lines.append("*Pódios já conquistados neste ciclo:*")
         for uid, qtd in sorted(info["podiums"].items(), key=lambda x: -x[1]):
             lines.append(f"- usuario `{uid}`: {qtd} pódio(s)")
     app.telegram.send_message(chat_id, "\n".join(lines))
