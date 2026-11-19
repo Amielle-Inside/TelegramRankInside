@@ -127,8 +127,12 @@ def _gerar_snapshot(app: RankingApp) -> int:
         # registra no log e tenta upload para repositorio remoto
         uploaded = 0
         upload_error = None
-        if SNAPSHOT_REPO_URL:
-            ok, err = _upload_snapshot_to_repo(file_path)
+        repo_url = SNAPSHOT_REPO_URL or app.config.get("SNAPSHOT_REPO_URL")
+        repo_user = SNAPSHOT_REPO_USER or app.config.get("SNAPSHOT_REPO_USER")
+        repo_token = SNAPSHOT_REPO_TOKEN or app.config.get("SNAPSHOT_REPO_TOKEN")
+        repo_branch = SNAPSHOT_REPO_BRANCH or app.config.get("SNAPSHOT_REPO_BRANCH", "main")
+        if repo_url:
+            ok, err = _upload_snapshot_to_repo(file_path, repo_url, repo_user, repo_token, repo_branch)
             uploaded = 1 if ok else 0
             upload_error = err
             if ok:
@@ -150,9 +154,12 @@ def _gerar_snapshot(app: RankingApp) -> int:
     return gerados
 
 
-def _init_snapshot_repo() -> bool:
+def _init_snapshot_repo(repo_url: str = None, repo_user: str = None, repo_token: str = None) -> bool:
     """Inicializa o repositorio local de snapshots se necessario."""
-    if not SNAPSHOT_REPO_URL:
+    url = repo_url or SNAPSHOT_REPO_URL
+    user = repo_user or SNAPSHOT_REPO_USER
+    token = repo_token or SNAPSHOT_REPO_TOKEN
+    if not url:
         return False
     SNAPSHOT_REPO_DIR.mkdir(parents=True, exist_ok=True)
     git_dir = SNAPSHOT_REPO_DIR / ".git"
@@ -160,13 +167,13 @@ def _init_snapshot_repo() -> bool:
         try:
             subprocess.run(["git", "init"], cwd=str(SNAPSHOT_REPO_DIR), check=True,
                            capture_output=True, timeout=30)
-            subprocess.run(["git", "remote", "add", "origin", SNAPSHOT_REPO_URL],
+            subprocess.run(["git", "remote", "add", "origin", url],
                            cwd=str(SNAPSHOT_REPO_DIR), check=True, capture_output=True, timeout=30)
             # configura credenciais via token se disponivel
-            if SNAPSHOT_REPO_TOKEN and SNAPSHOT_REPO_USER:
-                subprocess.run(["git", "config", "user.name", SNAPSHOT_REPO_USER],
+            if token and user:
+                subprocess.run(["git", "config", "user.name", user],
                                cwd=str(SNAPSHOT_REPO_DIR), check=True, capture_output=True)
-                subprocess.run(["git", "config", "user.email", f"{SNAPSHOT_REPO_USER}@users.noreply.github.com"],
+                subprocess.run(["git", "config", "user.email", f"{user}@users.noreply.github.com"],
                                cwd=str(SNAPSHOT_REPO_DIR), check=True, capture_output=True)
             print("[snapshot] repositorio local inicializado")
         except subprocess.CalledProcessError as e:
@@ -175,12 +182,16 @@ def _init_snapshot_repo() -> bool:
     return True
 
 
-def _upload_snapshot_to_repo(file_path: Path) -> tuple[bool, str]:
+def _upload_snapshot_to_repo(file_path: Path, repo_url: str = None, repo_user: str = None, repo_token: str = None, repo_branch: str = "main") -> tuple[bool, str]:
     """Faz commit e push de um arquivo de snapshot para o repositorio remoto.
     Retorna (sucesso, mensagem_erro)."""
-    if not SNAPSHOT_REPO_URL:
+    url = repo_url or SNAPSHOT_REPO_URL
+    user = repo_user or SNAPSHOT_REPO_USER
+    token = repo_token or SNAPSHOT_REPO_TOKEN
+    branch = repo_branch or SNAPSHOT_REPO_BRANCH or "main"
+    if not url:
         return False, "repositorio nao configurado"
-    if not _init_snapshot_repo():
+    if not _init_snapshot_repo(url, user, token):
         return False, "falha ao inicializar repositorio local"
 
     try:
@@ -201,24 +212,23 @@ def _upload_snapshot_to_repo(file_path: Path) -> tuple[bool, str]:
 
         # git push com autenticacao via token
         env = os.environ.copy()
-        if SNAPSHOT_REPO_TOKEN and SNAPSHOT_REPO_USER:
+        if token and user:
             # usa https com token embutido na URL para auth
-            repo_url = SNAPSHOT_REPO_URL
-            if repo_url.startswith("https://"):
-                token_url = repo_url.replace("https://", f"https://{SNAPSHOT_REPO_USER}:{SNAPSHOT_REPO_TOKEN}@")
+            if url.startswith("https://"):
+                token_url = url.replace("https://", f"https://{user}:{token}@")
                 push_result = subprocess.run(
-                    ["git", "push", "origin", f"HEAD:{SNAPSHOT_REPO_BRANCH}"],
+                    ["git", "push", token_url, f"HEAD:{branch}"],
                     cwd=str(SNAPSHOT_REPO_DIR), capture_output=True, timeout=60, env=env
                 )
                 # nao imprime o token em logs
             else:
                 push_result = subprocess.run(
-                    ["git", "push", "origin", f"HEAD:{SNAPSHOT_REPO_BRANCH}"],
+                    ["git", "push", "origin", f"HEAD:{branch}"],
                     cwd=str(SNAPSHOT_REPO_DIR), capture_output=True, timeout=60, env=env
                 )
         else:
             push_result = subprocess.run(
-                ["git", "push", "origin", f"HEAD:{SNAPSHOT_REPO_BRANCH}"],
+                ["git", "push", "origin", f"HEAD:{branch}"],
                 cwd=str(SNAPSHOT_REPO_DIR), capture_output=True, timeout=60, env=env
             )
 

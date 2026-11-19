@@ -1203,6 +1203,7 @@ class PanelHandler(BaseHTTPRequestHandler):
 
     def _snapshots_gerar(self, body_params) -> None:
         from bot.modules.ranking.storage import week_start_for
+        from run import _gerar_snapshot
         import time
         n = _gerar_snapshot(self.app)
         storage = self.app.storage
