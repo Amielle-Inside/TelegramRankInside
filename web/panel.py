@@ -517,13 +517,16 @@ class PanelHandler(BaseHTTPRequestHandler):
         </div>"""
 
         return f"""
-        <div class="grid2">
-          <div class="stat"><div class="v">{total_msgs}</div><div class="l">Mensagens armazenadas</div></div>
-          <div class="stat"><div class="v">{total_pts}</div><div class="l">Lançamentos de pontos</div></div>
-          <div class="stat"><div class="v">{total_users}</div><div class="l">Usuários únicos</div></div>
-          <div class="stat"><div class="v">{len(chats)}</div><div class="l">Grupos monitorados</div></div>
-          <div class="stat"><div class="v badge ok">Online</div><div class="l">Bot em execução</div></div>
-          <div class="stat"><div class="v">http://127.0.0.1:{self.app.config.get('WEB_PORT',2020)}/painel/</div><div class="l">Painel (localhost)</div></div>
+        <div class="card">
+          <h2>Visão geral</h2>
+          <div class="grid2">
+            <div class="stat"><div class="v">{total_msgs}</div><div class="l">Mensagens armazenadas</div></div>
+            <div class="stat"><div class="v">{total_pts}</div><div class="l">Lançamentos de pontos</div></div>
+            <div class="stat"><div class="v">{total_users}</div><div class="l">Usuários únicos</div></div>
+            <div class="stat"><div class="v">{len(chats)}</div><div class="l">Grupos monitorados</div></div>
+            <div class="stat"><div class="v badge ok">Online</div><div class="l">Bot em execução</div></div>
+            <div class="stat"><div class="v">{escape(str(self.app.config.get('WEB_PORT',2020)))}</div><div class="l">Painel em http://127.0.0.1:{self.app.config.get('WEB_PORT',2020)}/painel/</div></div>
+          </div>
         </div>
         {ciclo_html}
         <div class="card">
