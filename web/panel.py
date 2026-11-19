@@ -614,11 +614,38 @@ class PanelHandler(BaseHTTPRequestHandler):
 
     def _ciclos_html(self, qs) -> str:
         rows = self.app.storage.fetchall("SELECT * FROM ranking_cycles ORDER BY started_at DESC LIMIT 10")
-        data = [[r["cycle_id"], r["started_at"], r["state"], r["participants"]] for r in rows]
+        data = []
+        for r in rows:
+            import json as _json
+            participantes = _json.loads(r["participants"] or "[]")
+            n = len(participantes) if participantes else 0
+            semanas = -(-n // 3) if n > 0 else 1
+            from datetime import datetime, timedelta, timezone as _tz
+            try:
+                inicio = datetime.fromisoformat(r["started_at"])
+            except Exception:
+                inicio = datetime.now(_tz(timedelta(hours=-3)))
+            if not inicio.tzinfo:
+                inicio = inicio.replace(tzinfo=_tz(timedelta(hours=-3)))
+            termino = inicio + timedelta(weeks=semanas)
+            # pódios neste ciclo
+            podiums = self.app.storage.fetchall(
+                "SELECT COUNT(*) as qtd FROM ranking_podiums WHERE cycle_id = ?", (r["cycle_id"],)
+            )
+            qtd_podiums = podiums[0]["qtd"] if podiums else 0
+            data.append([
+                r["cycle_id"],
+                r["started_at"],
+                termino.strftime("%d/%m/%Y %H:%M"),
+                r["state"],
+                n,
+                qtd_podiums,
+            ])
         return f"""
         <div class="card">
           <h2>Ciclos de pódio</h2>
-          {_table(["ID do ciclo", "Início", "Estado", "Participantes (JSON)"], data, total=len(data))}
+          {_table(["ID do ciclo", "Início", "Término estimado", "Estado", "Participantes", "Pódios"], data, total=len(data))}
+          <p class="small">Término estimado = início + (ceil(participantes / 3)) semanas, com 3 vagas de pódio por semana.</p>
         </div>"""
 
     def _participantes_html(self, qs) -> str:
