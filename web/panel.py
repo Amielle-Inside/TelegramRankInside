@@ -47,7 +47,7 @@ def _page(title: str, body: str, active: str = "", chat_id: int | None = None, c
   .nav a:hover{{background:#334155;color:var(--text)}}
   .nav a.active{{background:var(--accent);color:#0f172a}}
   .nav-group{{display:flex;align-items:center;gap:0.5rem;padding:0.5rem 1rem;border-left:1px solid #334155;margin-left:auto}}
-  .container{{padding:1rem;max-width:1200px}}
+  .container{{padding:1rem;max-width:1200px;margin:0 auto}}
   .card{{background:var(--card);border-radius:8px;padding:1rem;margin-bottom:1rem;border:1px solid #334155}}
   .card h2{{font-size:1rem;margin:0 0 0.75rem;color:var(--accent);border-bottom:1px solid #334155;padding-bottom:0.4rem}}
   table{{width:100%;border-collapse:collapse;font-size:0.85rem}}
