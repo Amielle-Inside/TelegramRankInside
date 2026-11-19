@@ -154,6 +154,17 @@ class Storage:
                     used INTEGER NOT NULL DEFAULT 0
                 );
             """)
+            c.execute("""
+                CREATE TABLE IF NOT EXISTS snapshot_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    chat_id INTEGER NOT NULL,
+                    week_start TEXT NOT NULL,
+                    file_name TEXT NOT NULL,
+                    records INTEGER NOT NULL DEFAULT 0,
+                    uploaded INTEGER NOT NULL DEFAULT 0,
+                    created_at REAL NOT NULL
+                );
+            """)
 
 
 def now_utc() -> float:

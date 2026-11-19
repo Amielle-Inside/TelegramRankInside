@@ -112,6 +112,7 @@ def _page(title: str, body: str, active: str = "", chat_id: int | None = None, c
     <a href="/painel/modulos" class="{'active' if active=='modulos' else ''}">Módulos</a>
     <a href="/painel/operacao" class="{'active' if active=='operacao' else ''}">Operação e diagnósticos</a>
     <a href="/painel/exportar" class="{'active' if active=='exportar' else ''}">Backups e exportações</a>
+    <a href="/painel/snapshots" class="{'active' if active=='snapshots' else ''}">Snapshots</a>
     <a href="/painel/auditoria" class="{'active' if active=='auditoria' else ''}">Auditoria</a>
     <a href="/painel/config" class="{'active' if active=='config' else ''}">Configurações e acesso</a>
   </div>
@@ -343,6 +344,11 @@ class PanelHandler(BaseHTTPRequestHandler):
             self._send_html(200, _page("Backups e exportações", self._exportar_html(qs), "exportar", sel_chat_id, chats))
         elif path == "/painel/auditoria":
             self._send_html(200, _page("Auditoria", self._auditoria_html(qs), "auditoria", sel_chat_id, chats))
+        elif path == "/painel/snapshots":
+            self._send_html(200, _page("Snapshots", self._snapshots_html(qs), "snapshots", sel_chat_id, chats))
+        elif path == "/painel/snapshot/download":
+            self._snapshot_download(qs)
+            return
         elif path == "/painel/config":
             self._send_html(200, _page("Configurações e acesso", self._config_html(qs, is_owner), "config", sel_chat_id, chats))
         else:
@@ -387,6 +393,8 @@ class PanelHandler(BaseHTTPRequestHandler):
             self._exportar_importar()
         elif path == "/painel/auditoria/limpar":
             self._auditoria_limpar()
+        elif path == "/painel/snapshots/gerar":
+            self._snapshots_gerar(body_params)
         elif path == "/painel/sessao/encerrar":
             self._sessao_encerrar(qs)
         else:
@@ -843,6 +851,85 @@ class PanelHandler(BaseHTTPRequestHandler):
             <button class="btn danger" type="submit" onclick="return confirm('Tem certeza que deseja limpar todo o log de auditoria?')">Limpar log de auditoria</button>
           </form>
         </div>"""
+
+    def _snapshots_html(self, qs) -> str:
+        storage = self.app.storage
+        SNAPSHOT_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "snapshots"
+        arquivos = []
+        if SNAPSHOT_DIR.exists():
+            for f in sorted(SNAPSHOT_DIR.glob("snapshot_*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
+                try:
+                    data = json.loads(f.read_text(encoding="utf-8"))
+                    arquivos.append([
+                        f.name,
+                        str(data.get("chat_id", "—")),
+                        str(data.get("week_start", "—")),
+                        data.get("total_participantes", 0),
+                        round(data.get("total_pontos", 0), 2),
+                        f"<a href='/painel/snapshot/download?file={f.name}' class='btn primary' style='padding:0.2rem 0.5rem;font-size:0.8rem'>Baixar</a>",
+                    ])
+                except Exception:
+                    arquivos.append([f.name, "—", "—", 0, 0, "<span class='small'>erro ao ler</span>"])
+
+        rows = storage.fetchall("SELECT * FROM snapshot_log ORDER BY created_at DESC LIMIT 20")
+        log_rows = [[r["id"], r["chat_id"], r["week_start"], r["file_name"], r["records"], r["uploaded"], r["created_at"]] for r in rows]
+
+        return f"""
+        <div class="card">
+          <h2>Snapshots semanais</h2>
+          <p class="small">Snapshots gerados automaticamente toda segunda-feira para todos os grupos.</p>
+          <div style="margin-bottom:0.75rem">
+            <form method="POST" action="/painel/snapshots/gerar" style="display:inline">
+              <input type="hidden" name="csrf" value="{escape(self._csrf_token() or '')}">
+              <button class="btn primary" type="submit">Gerar snapshot agora</button>
+            </form>
+          </div>
+          <h3>Arquivos disponíveis ({len(arquivos)})</h3>
+          {_table(["Arquivo", "Chat ID", "Semana", "Participantes", "Pontos", "Ação"], arquivos, total=len(arquivos)) if arquivos else '<p class="small">Nenhum snapshot ainda.</p>'}
+        </div>
+        <div class="card">
+          <h2>Log de snapshots (últimos 20)</h2>
+          {_table(["ID", "Chat ID", "Semana", "Arquivo", "Registros", "Enviado", "Criado em"], log_rows, total=len(log_rows)) if log_rows else '<p class="small">Nenhum log ainda.</p>'}
+        </div>"""
+
+    def _snapshot_download(self, qs) -> None:
+        file_name = qs.get("file", [None])[0]
+        if not file_name:
+            self._send_html(400, _page("Erro", "<p>Arquivo não informado.</p>"))
+            return
+        if "/" in file_name or "\\" in file_name or ".." in file_name:
+            self._send_html(400, _page("Erro", "<p>Nome de arquivo inválido.</p>"))
+            return
+        SNAPSHOT_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "snapshots"
+        file_path = SNAPSHOT_DIR / file_name
+        if not file_path.exists():
+            self._send_html(404, _page("Não encontrado", "<p>Snapshot não encontrado.</p>"))
+            return
+        try:
+            data = file_path.read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Content-Disposition", f'attachment; filename="{file_name}"')
+            self.end_headers()
+            self.wfile.write(data)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+
+    def _snapshots_gerar(self, body_params) -> None:
+        from bot.modules.ranking.storage import week_start_for
+        import time
+        n = _gerar_snapshot(self.app)
+        storage = self.app.storage
+        try:
+            with storage.transaction() as c:
+                c.execute(
+                    "INSERT INTO audit_log (actor_id, action, params, result, created_at) VALUES (?, ?, ?, ?, ?)",
+                    (None, "snapshot_manual", json.dumps({"gerados": n}), f"{n} snapshots gerados manualmente", time.time()),
+                )
+        except Exception:
+            pass
+        self._send_html(200, _page("Snapshot", f"<p>{n} snapshot(s) gerado(s) com sucesso.</p><p><a href='/painel/snapshots'>Voltar para snapshots</a></p>", "snapshots"))
 
     def _config_html(self, qs, is_owner: bool) -> str:
         storage = self.app.storage
