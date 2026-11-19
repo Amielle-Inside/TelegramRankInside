@@ -416,6 +416,10 @@ class PanelHandler(BaseHTTPRequestHandler):
               <label>Senha</label>
               <input name="senha" type="password" required>
             </div>
+            <div class="form-group" style="display:flex;align-items:center;gap:0.5rem">
+              <input name="lembrar" type="checkbox" id="lembrar">
+              <label for="lembrar" style="margin:0;font-size:0.85rem">Lembrar-me (30 dias)</label>
+            </div>
             <button class="btn primary" type="submit">Entrar</button>
           </form>
           <p class="small">Acesso restrito a 127.0.0.1</p>
@@ -442,16 +446,18 @@ class PanelHandler(BaseHTTPRequestHandler):
 
         token = secrets.token_urlsafe(32)
         now = time.time()
+        lembrar = params.get("lembrar", [""])[0] == "on"
+        max_age = 30 * 24 * 3600 if lembrar else 3600  # 30 dias ou 1 hora
         with self.app.storage.transaction() as c:
             c.execute(
                 "INSERT OR REPLACE INTO web_sessions (token, username, created_at, expires_at) VALUES (?, ?, ?, ?)",
-                (token, usuario, now, now + 3600),
+                (token, usuario, now, now + max_age),
             )
         self.send_response(302)
         self.send_header("Location", "/painel/")
         self.send_header(
             "Set-Cookie",
-            f"session={token}; Path=/painel; HttpOnly; SameSite=Lax; Max-Age=3600",
+            f"session={token}; Path=/painel; HttpOnly; SameSite=Lax; Max-Age={max_age}",
         )
         self.end_headers()
 
