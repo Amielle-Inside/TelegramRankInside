@@ -1,9 +1,14 @@
 """Modulo ranking - manifest."""
 
+from pathlib import Path
 from bot.core.commands import Command
 
 MODULE_ID = "ranking"
-VERSION = "1.0.0"
+_VERSION_FILE = Path(__file__).resolve().parent.parent.parent.parent / "VERSION"
+try:
+    VERSION = _VERSION_FILE.read_text(encoding="utf-8").strip()
+except Exception:
+    VERSION = "1.0.0"
 EVENTS_USED = ["message", "edited_message"]
 
 COMMANDS = [
