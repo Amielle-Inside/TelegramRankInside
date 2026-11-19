@@ -787,10 +787,37 @@ class PanelHandler(BaseHTTPRequestHandler):
     def _auditoria_html(self, qs) -> str:
         storage = self.app.storage
         rows = storage.fetchall("SELECT id, actor_id, action, params, result, created_at FROM audit_log ORDER BY created_at DESC LIMIT 100")
-        data = [[r["id"], r["actor_id"], r["action"], r["params"] or "", r["result"] or "", r["created_at"]] for r in rows]
+        data = []
+        for r in rows:
+            import json as _json
+            params = r["params"] or ""
+            params_legivel = ""
+            if params:
+                try:
+                    p = _json.loads(params)
+                    if isinstance(p, dict):
+                        partes = []
+                        for k, v in p.items():
+                            partes.append(f"{k}={v}")
+                        params_legivel = "; ".join(partes)
+                    else:
+                        params_legivel = str(p)
+                except Exception:
+                    params_legivel = params
+            data.append([
+                r["id"],
+                r["actor_id"] or "—",
+                r["action"],
+                params_legivel,
+                r["result"] or "—",
+                r["created_at"],
+            ])
         # estatisticas de auditoria
         stats = storage.fetchall("SELECT action, COUNT(*) as qtd FROM audit_log GROUP BY action ORDER BY qtd DESC")
         stat_rows = [[s["action"], s["qtd"]] for s in stats]
+        # usuarios que mais auditoria fizeram
+        top_atores = storage.fetchall("SELECT actor_id, COUNT(*) as qtd FROM audit_log WHERE actor_id IS NOT NULL GROUP BY actor_id ORDER BY qtd DESC LIMIT 5")
+        ator_rows = [[r["actor_id"], r["qtd"]] for r in top_atores]
         csrf = self._csrf_token() or ""
         return f"""
         <div class="grid2">
@@ -800,6 +827,10 @@ class PanelHandler(BaseHTTPRequestHandler):
         <div class="card">
           <h2>Ações por tipo</h2>
           {_table(["Ação", "Quantidade"], stat_rows, total=len(stat_rows)) if stat_rows else '<p class="small">Sem auditoria ainda.</p>'}
+        </div>
+        <div class="card">
+          <h2>Usuários que mais auditam</h2>
+          {_table(["Usuário (ID)", "Ações"], ator_rows, total=len(ator_rows)) if ator_rows else '<p class="small">Nenhum ainda.</p>'}
         </div>
         <div class="card">
           <h2>Log de auditoria (últimas 100)</h2>

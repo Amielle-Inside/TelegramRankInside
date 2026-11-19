@@ -14,6 +14,7 @@ from bot.core.app import RankingApp
 from bot.core.storage import Storage
 from bot.modules.ranking.storage import week_start_for
 import time
+import json
 
 
 def _tz():
@@ -251,10 +252,55 @@ def cmd_status(app: RankingApp, user_id: Optional[int], chat_id: Optional[int],
 
 def cmd_check(app: RankingApp, user_id: Optional[int], chat_id: Optional[int],
               args: Optional[str], msg: dict) -> None:
-    # placeholder de auditoria (recontagem)
+    # recontagem em modo auditoria: recalcula pontos da semana atual
     if not chat_id:
         return
-    app.telegram.send_message(chat_id, "!check: recontagem em modo auditoria. (implementacao base pronta)")
+    storage: Storage = app.storage
+    from bot.modules.ranking.storage import week_start_for
+    import time
+    ws = week_start_for(int(time.time()), app.config.get("TZ", "America/Sao_Paulo"))
+
+    # recontar pontos por usuario nesta semana
+    rows = storage.fetchall("""
+        SELECT user_id, SUM(points) as total, COUNT(*) as qtd
+        FROM ranking_points
+        WHERE chat_id = ? AND week_start = ?
+        GROUP BY user_id
+        ORDER BY total DESC
+    """, (chat_id, ws))
+
+    total_usuarios = len(rows)
+    total_pontos = round(sum(r["total"] for r in rows), 2)
+    total_launchs = sum(r["qtd"] for r in rows)
+
+    # registrar auditoria
+    try:
+        params = {
+            "chat_id": chat_id,
+            "week_start": ws,
+            "usuarios_recontados": total_usuarios,
+            "total_pontos": total_pontos,
+            "total_lancamentos": total_launchs,
+        }
+        with storage.transaction() as c:
+            c.execute(
+                "INSERT INTO audit_log (actor_id, action, params, result, created_at) VALUES (?, ?, ?, ?, ?)",
+                (user_id, "check", json.dumps(params), f"{total_usuarios} usuarios, {total_pontos} pts, {total_launchs} lancamentos", time.time()),
+            )
+    except Exception:
+        pass
+
+    linhas = [
+        f"*Auditoria !check — Semana {ws}*",
+        f"Usuarios recontados: {total_usuarios}",
+        f"Total de pontos: {total_pontos}",
+        f"Total de lançamentos: {total_launchs}",
+    ]
+    if rows:
+        linhas.append("\n*Top 5 após recontagem:*")
+        for i, r in enumerate(rows[:5], 1):
+            linhas.append(f"{i}. usuario `{r['user_id']}`: {round(r['total'], 2)} pts ({r['qtd']} lançamentos)")
+    app.telegram.send_message(chat_id, "\n".join(linhas))
 
 
 def cmd_stop(app: RankingApp, user_id: Optional[int], chat_id: Optional[int],
