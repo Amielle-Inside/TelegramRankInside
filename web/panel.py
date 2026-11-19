@@ -535,7 +535,22 @@ class PanelHandler(BaseHTTPRequestHandler):
     def _rankings_html(self, qs) -> str:
         chat_id = int(qs.get("chat_id", ["-1002267119439"])[0])
         from bot.modules.ranking.storage import week_start_for
-        ws = week_start_for(int(time.time()), self.app.config.get("TZ", "America/Sao_Paulo"))
+        # semana selecionada (ou atual)
+        ws_param = qs.get("week_start", [None])[0]
+        if ws_param:
+            ws = ws_param
+        else:
+            ws = week_start_for(int(time.time()), self.app.config.get("TZ", "America/Sao_Paulo"))
+        # lista de semanas disponíveis para filtro
+        weeks = self.app.storage.fetchall(
+            "SELECT DISTINCT week_start as ws FROM ranking_points WHERE chat_id = ? ORDER BY week_start DESC LIMIT 20",
+            (chat_id,)
+        )
+        week_options = "".join(
+            f'<option value="{w["ws"]}" {"selected" if w["ws"] == ws else ""}>{w["ws"]}</option>'
+            for w in weeks
+        )
+        current_ws = week_start_for(int(time.time()), self.app.config.get("TZ", "America/Sao_Paulo"))
         rows = self.app.storage.fetchall("""
             SELECT rp.user_id,
                    SUM(rp.points) as total,
@@ -573,7 +588,23 @@ class PanelHandler(BaseHTTPRequestHandler):
               <div style="display:flex;gap:0.5rem;flex-wrap:wrap">{''.join(podium_items)}</div>
             </div>"""
 
+        # filtro de semana
+        semana_filtro = f"""
+        <div class="card" style="max-width:700px;margin:0 auto 1rem auto">
+          <form method="GET" action="/painel/rankings" style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">
+            <input type="hidden" name="chat_id" value="{chat_id}">
+            <label style="font-size:0.85rem;color:var(--muted);margin:0">Semana:</label>
+            <select name="week_start" onchange="this.form.submit()" style="flex:1;padding:0.4rem;border:1px solid #334155;border-radius:6px;background:#0f172a;color:var(--text);min-width:140px">
+              <option value="">Semana atual ({current_ws})</option>
+              {week_options}
+            </select>
+            <noscript><button class="btn primary" type="submit">Ir</button></noscript>
+          </form>
+          <p class="small">Selecione uma semana passada para ver o ranking histórico dela.</p>
+        </div>"""
+
         return f"""
+        {semana_filtro}
         {podium_html}
         <div class="card">
           <h2>Top 10 — Semana {ws}</h2>
