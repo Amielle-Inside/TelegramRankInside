@@ -29,13 +29,12 @@ def _page(title: str, body: str, active: str = "", chat_id: int | None = None, c
             sel = " selected" if c["id"] == selected else ""
             opts += f"<option value=\"{c['id']}\"{sel}>{escape(nome)} ({members} membros)</option>"
         seletor = f"""
-        <div class="card" style="max-width:700px;margin:0 auto 1rem auto">
-          <form method="GET" action="/painel/rankings" style="display:flex;gap:0.5rem;align-items:center">
-            <label style="font-size:0.85rem;color:var(--muted);margin:0">Grupo:</label>
-            <select name="chat_id" onchange="this.form.submit()" style="flex:1;padding:0.4rem;border:1px solid #334155;border-radius:6px;background:#0f172a;color:var(--text)">{opts}</select>
-            <noscript><button class="btn primary" type="submit">Ir</button></noscript>
+        <div class="nav-group">
+          <form method="GET" action="/painel/rankings" style="display:flex;align-items:center;gap:0.5rem;margin:0">
+            <label style="font-size:0.8rem;color:var(--muted);margin:0">Grupo:</label>
+            <select name="chat_id" onchange="this.form.submit()" style="padding:0.35rem 0.6rem;border:1px solid #334155;border-radius:6px;background:#0f172a;color:var(--text);font-size:0.85rem">{opts}</select>
+            <noscript><button class="btn primary" type="submit" style="font-size:0.85rem;padding:0.35rem 0.6rem">Ir</button></noscript>
           </form>
-          <p class="small">Selecione o grupo para ver seu ranking, participantes e exportações.</p>
         </div>"""
     return f"""<!DOCTYPE html>
 <html lang="pt-BR">
@@ -55,6 +54,7 @@ def _page(title: str, body: str, active: str = "", chat_id: int | None = None, c
   .nav a{{padding:0.5rem 0.9rem;border-radius:6px;color:var(--muted);text-decoration:none;font-size:0.85rem;white-space:nowrap}}
   .nav a:hover{{background:#334155;color:var(--text)}}
   .nav a.active{{background:var(--accent);color:#0f172a}}
+  .nav-group{{display:flex;align-items:center;gap:0.5rem;padding:0.5rem 1rem;border-left:1px solid #334155;margin-left:auto}}
   .container{{padding:1rem;max-width:1200px}}
   .card{{background:var(--card);border-radius:8px;padding:1rem;margin-bottom:1rem;border:1px solid #334155}}
   .card h2{{font-size:1rem;margin:0 0 0.75rem;color:var(--accent);border-bottom:1px solid #334155;padding-bottom:0.4rem}}
@@ -101,7 +101,6 @@ def _page(title: str, body: str, active: str = "", chat_id: int | None = None, c
       <a href="/painel/sair">Sair</a>
     </div>
   </div>
-  {seletor}
   <div class="nav">
     <a href="/painel/" class="{'active' if active=='overview' else ''}">Visão geral</a>
     <a href="/painel/rankings" class="{'active' if active=='rankings' else ''}">Rankings</a>
