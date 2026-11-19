@@ -593,17 +593,33 @@ class PanelHandler(BaseHTTPRequestHandler):
     def _participantes_html(self, qs) -> str:
         chat_id = int(qs.get("chat_id", ["-1002267119439"])[0])
         rows = self.app.storage.fetchall("""
-            SELECT user_id, COUNT(*) as msgs, SUM(points) as total
-            FROM ranking_points
-            WHERE chat_id = ?
-            GROUP BY user_id
+            SELECT rp.user_id,
+                   MAX(rm.username) as username,
+                   MAX(rm.first_name) as first_name,
+                   COUNT(*) as msgs,
+                   SUM(rp.points) as total
+            FROM ranking_points rp
+            LEFT JOIN ranking_messages rm ON rm.chat_id = rp.chat_id AND rm.user_id = rp.user_id
+            WHERE rp.chat_id = ?
+            GROUP BY rp.user_id
             ORDER BY total DESC
         """, (chat_id,))
-        data = [[r["user_id"], r["msgs"], round(r["total"], 2)] for r in rows]
+        data = []
+        for r in rows:
+            uid = r["user_id"]
+            username = r["username"] or ""
+            first = r["first_name"] or ""
+            if username:
+                nome = f"@{username}"
+            elif first:
+                nome = first
+            else:
+                nome = f"ID {uid}"
+            data.append([nome, uid, r["msgs"], round(r["total"], 2)])
         return f"""
         <div class="card">
           <h2>Participantes — grupo {chat_id}</h2>
-          {_table(["Usuário (ID)", "Mensagens pontuadas", "Pontos totais"], data, total=len(data))}
+          {_table(["Usuário", "ID", "Mensagens pontuadas", "Pontos totais"], data, total=len(data))}
         </div>"""
 
     def _regras_html(self) -> str:
