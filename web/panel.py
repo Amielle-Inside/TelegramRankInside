@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import secrets
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -20,22 +21,13 @@ from bot.core.app import RankingApp
 def _page(title: str, body: str, active: str = "", chat_id: int | None = None, chats: list | None = None) -> str:
     chats = chats or []
     selected = chat_id
-    seletor = ""
+    opts = ""
     if chats:
-        opts = ""
         for c in chats:
             nome = c.get("title") or c.get("username") or f"Chat {c['id']}"
             members = c.get("member_count", "?")
             sel = " selected" if c["id"] == selected else ""
             opts += f"<option value=\"{c['id']}\"{sel}>{escape(nome)} ({members} membros)</option>"
-        seletor = f"""
-        <div class="nav-group">
-          <form method="GET" action="/painel/rankings" style="display:flex;align-items:center;gap:0.5rem;margin:0">
-            <label style="font-size:0.8rem;color:var(--muted);margin:0">Grupo:</label>
-            <select name="chat_id" onchange="this.form.submit()" style="padding:0.35rem 0.6rem;border:1px solid #334155;border-radius:6px;background:#0f172a;color:var(--text);font-size:0.85rem">{opts}</select>
-            <noscript><button class="btn primary" type="submit" style="font-size:0.85rem;padding:0.35rem 0.6rem">Ir</button></noscript>
-          </form>
-        </div>"""
     return f"""<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -114,6 +106,11 @@ def _page(title: str, body: str, active: str = "", chat_id: int | None = None, c
     <a href="/painel/snapshots" class="{'active' if active=='snapshots' else ''}">Snapshots</a>
     <a href="/painel/auditoria" class="{'active' if active=='auditoria' else ''}">Auditoria</a>
     <a href="/painel/config" class="{'active' if active=='config' else ''}">Configurações e acesso</a>
+    <form method="GET" action="/painel/rankings" style="display:flex;align-items:center;gap:0.5rem;margin-left:auto;padding:0 1rem;border-left:1px solid #334155">
+      <label style="font-size:0.78rem;color:var(--muted);margin:0;white-space:nowrap">Grupo:</label>
+      <select name="chat_id" onchange="this.form.submit()" style="padding:0.3rem 0.5rem;border:1px solid #334155;border-radius:6px;background:#0f172a;color:var(--text);font-size:0.82rem;min-width:170px">{opts}</select>
+      <noscript><button class="btn primary" type="submit" style="font-size:0.8rem;padding:0.3rem 0.6rem">Ir</button></noscript>
+    </form>
   </div>
   <div class="container">
     {body}
@@ -564,6 +561,15 @@ class PanelHandler(BaseHTTPRequestHandler):
             for w in weeks
         )
         current_ws = week_start_for(int(time.time()), self.app.config.get("TZ", "America/Sao_Paulo"))
+        # ----- Filtros avançados -----
+        filtro_pos = qs.get("f_pos", [""])[0].strip()      # posicao exata
+        filtro_pos_ge = qs.get("f_pos_ge", [""])[0].strip() # posicao >=
+        filtro_pos_le = qs.get("f_pos_le", [""])[0].strip() # posicao <=
+        filtro_user = qs.get("f_user", [""])[0].strip()     # usuario contem
+        filtro_id = qs.get("f_id", [""])[0].strip()         # id exato
+        filtro_pts_ge = qs.get("f_pts_ge", [""])[0].strip() # pontos >=
+        filtro_pts_le = qs.get("f_pts_le", [""])[0].strip() # pontos <=
+
         rows = self.app.storage.fetchall("""
             SELECT rp.user_id,
                    SUM(rp.points) as total,
@@ -573,9 +579,59 @@ class PanelHandler(BaseHTTPRequestHandler):
             LEFT JOIN ranking_messages rm ON rm.chat_id = rp.chat_id AND rm.user_id = rp.user_id
             WHERE rp.chat_id = ? AND rp.week_start = ?
             GROUP BY rp.user_id
-            ORDER BY total DESC
         """, (chat_id, ws))
-        data = [[r["user_id"], round(r["total"], 2), r["username"], r["first_name"]] for r in rows]
+
+        # Monta lista com posição
+        ranked = []
+        for i, r in enumerate(sorted(rows, key=lambda x: x["total"], reverse=True), start=1):
+            ranked.append({
+                "pos": i,
+                "user_id": r["user_id"],
+                "total": round(r["total"], 2),
+                "username": r["username"] or "",
+                "first_name": r["first_name"] or "",
+            })
+
+        # Aplica filtros
+        filtrados = []
+        for item in ranked:
+            ok = True
+            if filtro_pos and str(item["pos"]) != filtro_pos:
+                ok = False
+            if ok and filtro_pos_ge:
+                try:
+                    if item["pos"] < int(filtro_pos_ge):
+                        ok = False
+                except ValueError:
+                    pass
+            if ok and filtro_pos_le:
+                try:
+                    if item["pos"] > int(filtro_pos_le):
+                        ok = False
+                except ValueError:
+                    pass
+            if ok and filtro_user:
+                if filtro_user.lower() not in (item["username"] + " " + item["first_name"]).lower():
+                    ok = False
+            if ok and filtro_id:
+                if str(item["user_id"]) != filtro_id:
+                    ok = False
+            if ok and filtro_pts_ge:
+                try:
+                    if item["total"] < float(filtro_pts_ge):
+                        ok = False
+                except ValueError:
+                    pass
+            if ok and filtro_pts_le:
+                try:
+                    if item["total"] > float(filtro_pts_le):
+                        ok = False
+                except ValueError:
+                    pass
+            if ok:
+                filtrados.append(item)
+
+        data = [[r["pos"], f"@{r['username']}" if r["username"] else (r["first_name"] or f'Usuário {r["user_id"]}'), r["user_id"], r["total"]] for r in filtrados]
 
         # Podio visual (top 3)
         podium_html = ""
@@ -585,10 +641,10 @@ class PanelHandler(BaseHTTPRequestHandler):
             for i in range(min(3, len(data))):
                 pos = i + 1
                 medal = medals.get(pos, str(pos))
-                uid, pts, uname, fname = data[i]
-                nome = f"@{uname}" if uname else (fname or f"Usuário {uid}")
+                uid, pts, uname, fname = data[i][2], data[i][3], data[i][1], data[i][1]
+                nome = uname if uname.startswith("@") else (fname or f"ID {uid}")
                 podium_items.append(
-                    f"<div style='display:flex;align-items:center;gap:0.75rem;padding:0.75rem;border-radius:8px;"
+                    f"<div style='display:flex;align-items:center;gap:0.75rem;padding:0.75rem;border-radius:8px;'"
                     f"background:#334155;margin-bottom:0.5rem;border:1px solid #475569;'>"
                     f"<span style='font-size:1.5rem'>{medal}</span>"
                     f"<div><strong>#{pos}</strong> — <code>{nome}</code> (ID {uid})</div>"
@@ -601,13 +657,13 @@ class PanelHandler(BaseHTTPRequestHandler):
               <div style="display:flex;gap:0.5rem;flex-wrap:wrap">{''.join(podium_items)}</div>
             </div>"""
 
-        # filtro de semana
+        # Filtro de semana
         semana_filtro = f"""
-        <div class="card" style="max-width:700px;margin:0 auto 1rem auto">
-          <form method="GET" action="/painel/rankings" style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">
+        <div class="card" style="max-width:900px;margin:0 auto 1rem auto">
+          <form method="GET" action="/painel/rankings" style="display:flex;gap:0.5rem;align-items:flex-start;flex-wrap:wrap">
             <input type="hidden" name="chat_id" value="{chat_id}">
-            <label style="font-size:0.85rem;color:var(--muted);margin:0">Semana:</label>
-            <select name="week_start" onchange="this.form.submit()" style="flex:1;padding:0.4rem;border:1px solid #334155;border-radius:6px;background:#0f172a;color:var(--text);min-width:140px">
+            <label style="font-size:0.8rem;color:var(--muted);margin:0;white-space:nowrap">Semana:</label>
+            <select name="week_start" onchange="this.form.submit()" style="padding:0.35rem;border:1px solid #334155;border-radius:6px;background:#0f172a;color:var(--text);font-size:0.82rem;min-width:130px">
               <option value="">Semana atual ({current_ws})</option>
               {week_options}
             </select>
@@ -616,45 +672,171 @@ class PanelHandler(BaseHTTPRequestHandler):
           <p class="small">Selecione uma semana passada para ver o ranking histórico dela.</p>
         </div>"""
 
+        # Filtros avançados
+        filtros_avancados = f"""
+        <div class="card" style="max-width:900px;margin:0 auto 1rem auto">
+          <h3 style="margin-top:0;font-size:0.9rem;color:var(--accent)">Filtro avançado — Ranking</h3>
+          <form method="GET" action="/painel/rankings" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:0.5rem;align-items:end">
+            <input type="hidden" name="chat_id" value="{chat_id}">
+            <input type="hidden" name="week_start" value="{ws}">
+            <div style="display:flex;flex-direction:column">
+              <label style="font-size:0.75rem;color:var(--muted)">Posição exata</label>
+              <input name="f_pos" type="number" value="{filtro_pos}" placeholder="ex: 5" style="padding:0.35rem;border:1px solid #334155;border-radius:6px;background:#0f172a;color:var(--text);font-size:0.82rem">
+            </div>
+            <div style="display:flex;flex-direction:column;gap:0.25rem">
+              <label style="font-size:0.75rem;color:var(--muted)">Posição ≥</label>
+              <input name="f_pos_ge" type="number" value="{filtro_pos_ge}" placeholder="mín" style="padding:0.35rem;border:1px solid #334155;border-radius:6px;background:#0f172a;color:var(--text);font-size:0.82rem">
+              <label style="font-size:0.75rem;color:var(--muted)">Posição ≤</label>
+              <input name="f_pos_le" type="number" value="{filtro_pos_le}" placeholder="máx" style="padding:0.35rem;border:1px solid #334155;border-radius:6px;background:#0f172a;color:var(--text);font-size:0.82rem">
+            </div>
+            <div style="display:flex;flex-direction:column">
+              <label style="font-size:0.75rem;color:var(--muted)">Usuário contém</label>
+              <input name="f_user" type="text" value="{escape(filtro_user)}" placeholder="@nome" style="padding:0.35rem;border:1px solid #334155;border-radius:6px;background:#0f172a;color:var(--text);font-size:0.82rem">
+            </div>
+            <div style="display:flex;flex-direction:column">
+              <label style="font-size:0.75rem;color:var(--muted)">ID exato</label>
+              <input name="f_id" type="number" value="{filtro_id}" placeholder="user_id" style="padding:0.35rem;border:1px solid #334155;border-radius:6px;background:#0f172a;color:var(--text);font-size:0.82rem">
+            </div>
+            <div style="display:flex;flex-direction:column;gap:0.25rem">
+              <label style="font-size:0.75rem;color:var(--muted)">Pontos ≥</label>
+              <input name="f_pts_ge" type="number" step="0.1" value="{filtro_pts_ge}" placeholder="0" style="padding:0.35rem;border:1px solid #334155;border-radius:6px;background:#0f172a;color:var(--text);font-size:0.82rem">
+              <label style="font-size:0.75rem;color:var(--muted)">Pontos ≤</label>
+              <input name="f_pts_le" type="number" step="0.1" value="{filtro_pts_le}" placeholder="0" style="padding:0.35rem;border:1px solid #334155;border-radius:6px;background:#0f172a;color:var(--text);font-size:0.82rem">
+            </div>
+            <button class="btn primary" type="submit" style="padding:0.4rem 0.8rem;font-size:0.82rem">Aplicar filtro</button>
+            <a href="/painel/rankings?chat_id={chat_id}&week_start={ws}" class="btn" style="padding:0.4rem 0.8rem;font-size:0.82rem;text-decoration:none">Limpar</a>
+          </form>
+          <p class="small">Filtre por posição, usuário, ID ou pontos. Combine vários critérios.</p>
+        </div>"""
+
         return f"""
         {semana_filtro}
+        {filtros_avancados}
         {podium_html}
         <div class="card">
           <h2>Top 10 — Semana {ws}</h2>
-          {_table(["Posição", "Usuário", "ID", "Pontos"], [[i+1, f"@{r[2]}" if r[2] else (r[3] or f'Usuário {r[0]}'), r[0], r[1]] for i, r in enumerate(data[:10])], total=len(data))}
-          <p class="small">{len(data)} participante(s) pontuou(ram) nesta semana.</p>
+          {_table(["Posição", "Usuário", "ID", "Pontos"], data[:10], total=len(data))}
+          <p class="small">{len(data)} participante(s) corresponde(m) ao(s) filtro(s).</p>
         </div>"""
 
     def _ciclos_html(self, qs) -> str:
-        rows = self.app.storage.fetchall("SELECT * FROM ranking_cycles ORDER BY started_at DESC LIMIT 10")
+        # ----- Filtros avançados para ciclos -----
+        filtro_estado = qs.get("f_estado", [""])[0].strip()
+        filtro_inicio_de = qs.get("f_inicio_de", [""])[0].strip()
+        filtro_inicio_ate = qs.get("f_inicio_ate", [""])[0].strip()
+        filtro_part_ge = qs.get("f_part_ge", [""])[0].strip()
+        filtro_part_le = qs.get("f_part_le", [""])[0].strip()
+        filtro_podio_ge = qs.get("f_podio_ge", [""])[0].strip()
+
+        rows = self.app.storage.fetchall("SELECT * FROM ranking_cycles ORDER BY started_at DESC LIMIT 50")
         data = []
+        from datetime import datetime, timedelta, timezone as _tz
+        import json as _json
         for r in rows:
-            import json as _json
             participantes = _json.loads(r["participants"] or "[]")
             n = len(participantes) if participantes else 0
-            semanas = -(-n // 3) if n > 0 else 1
-            from datetime import datetime, timedelta, timezone as _tz
             try:
                 inicio = datetime.fromisoformat(r["started_at"])
             except Exception:
                 inicio = datetime.now(_tz(timedelta(hours=-3)))
             if not inicio.tzinfo:
                 inicio = inicio.replace(tzinfo=_tz(timedelta(hours=-3)))
+            semanas = -(-n // 3) if n > 0 else 1
             termino = inicio + timedelta(weeks=semanas)
-            # pódios neste ciclo
             podiums = self.app.storage.fetchall(
                 "SELECT COUNT(*) as qtd FROM ranking_podiums WHERE cycle_id = ?", (r["cycle_id"],)
             )
             qtd_podiums = podiums[0]["qtd"] if podiums else 0
+
+            # Aplica filtros
+            ok = True
+            if filtro_estado and r["state"] != filtro_estado:
+                ok = False
+            if ok and filtro_inicio_de:
+                try:
+                    if inicio.isoformat() < filtro_inicio_de:
+                        ok = False
+                except Exception:
+                    pass
+            if ok and filtro_inicio_ate:
+                try:
+                    if inicio.isoformat() > filtro_inicio_ate:
+                        ok = False
+                except Exception:
+                    pass
+            if ok and filtro_part_ge:
+                try:
+                    if n < int(filtro_part_ge):
+                        ok = False
+                except ValueError:
+                    pass
+            if ok and filtro_part_le:
+                try:
+                    if n > int(filtro_part_le):
+                        ok = False
+                except ValueError:
+                    pass
+            if ok and filtro_podio_ge:
+                try:
+                    if qtd_podiums < int(filtro_podio_ge):
+                        ok = False
+                except ValueError:
+                    pass
+            if not ok:
+                continue
+
             data.append([
                 r["cycle_id"],
-                r["started_at"],
+                inicio.strftime("%d/%m/%Y %H:%M"),
                 termino.strftime("%d/%m/%Y %H:%M"),
                 r["state"],
                 n,
                 qtd_podiums,
             ])
+
+        estados = ["active", "completed", "paused", "cancelled"]
+        estado_opts = "".join(
+            f'<option value="{e}" {"selected" if e == filtro_estado else ""}>{e}</option>'
+            for e in estados
+        )
+
+        filtros_avancados = f"""
+        <div class="card" style="max-width:900px;margin:0 auto 1rem auto">
+          <h3 style="margin-top:0;font-size:0.9rem;color:var(--accent)">Filtro avançado — Ciclos</h3>
+          <form method="GET" action="/painel/ciclos" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:0.5rem;align-items:end">
+            <div style="display:flex;flex-direction:column">
+              <label style="font-size:0.75rem;color:var(--muted)">Estado</label>
+              <select name="f_estado" style="padding:0.35rem;border:1px solid #334155;border-radius:6px;background:#0f172a;color:var(--text);font-size:0.82rem">
+                <option value="">todos</option>
+                {estado_opts}
+              </select>
+            </div>
+            <div style="display:flex;flex-direction:column">
+              <label style="font-size:0.75rem;color:var(--muted)">Início de</label>
+              <input name="f_inicio_de" type="datetime-local" value="{filtro_inicio_de}" style="padding:0.35rem;border:1px solid #334155;border-radius:6px;background:#0f172a;color:var(--text);font-size:0.82rem">
+            </div>
+            <div style="display:flex;flex-direction:column">
+              <label style="font-size:0.75rem;color:var(--muted)">Início até</label>
+              <input name="f_inicio_ate" type="datetime-local" value="{filtro_inicio_ate}" style="padding:0.35rem;border:1px solid #334155;border-radius:6px;background:#0f172a;color:var(--text);font-size:0.82rem">
+            </div>
+            <div style="display:flex;flex-direction:column;gap:0.25rem">
+              <label style="font-size:0.75rem;color:var(--muted)">Participantes ≥</label>
+              <input name="f_part_ge" type="number" value="{filtro_part_ge}" placeholder="mín" style="padding:0.35rem;border:1px solid #334155;border-radius:6px;background:#0f172a;color:var(--text);font-size:0.82rem">
+              <label style="font-size:0.75rem;color:var(--muted)">Participantes ≤</label>
+              <input name="f_part_le" type="number" value="{filtro_part_le}" placeholder="máx" style="padding:0.35rem;border:1px solid #334155;border-radius:6px;background:#0f172a;color:var(--text);font-size:0.82rem">
+            </div>
+            <div style="display:flex;flex-direction:column">
+              <label style="font-size:0.75rem;color:var(--muted)">Pódios ≥</label>
+              <input name="f_podio_ge" type="number" value="{filtro_podio_ge}" placeholder="mín" style="padding:0.35rem;border:1px solid #334155;border-radius:6px;background:#0f172a;color:var(--text);font-size:0.82rem">
+            </div>
+            <button class="btn primary" type="submit" style="padding:0.4rem 0.8rem;font-size:0.82rem">Aplicar filtro</button>
+            <a href="/painel/ciclos" class="btn" style="padding:0.4rem 0.8rem;font-size:0.82rem;text-decoration:none">Limpar</a>
+          </form>
+          <p class="small">Filtre por estado, período de início, quantidade de participantes e pódios.</p>
+        </div>"""
+
         return f"""
+        {filtros_avancados}
         <div class="card">
           <h2>Ciclos de pódio</h2>
           {_table(["ID do ciclo", "Início", "Término estimado", "Estado", "Participantes", "Pódios"], data, total=len(data))}
@@ -663,6 +845,14 @@ class PanelHandler(BaseHTTPRequestHandler):
 
     def _participantes_html(self, qs) -> str:
         chat_id = int(qs.get("chat_id", ["-1002267119439"])[0])
+        # ----- Filtros avançados para participantes -----
+        filtro_user = qs.get("f_user", [""])[0].strip()
+        filtro_id = qs.get("f_id", [""])[0].strip()
+        filtro_msgs_ge = qs.get("f_msgs_ge", [""])[0].strip()
+        filtro_msgs_le = qs.get("f_msgs_le", [""])[0].strip()
+        filtro_pts_ge = qs.get("f_pts_ge", [""])[0].strip()
+        filtro_pts_le = qs.get("f_pts_le", [""])[0].strip()
+
         rows = self.app.storage.fetchall("""
             SELECT rp.user_id,
                    MAX(rm.username) as username,
@@ -673,8 +863,8 @@ class PanelHandler(BaseHTTPRequestHandler):
             LEFT JOIN ranking_messages rm ON rm.chat_id = rp.chat_id AND rm.user_id = rp.user_id
             WHERE rp.chat_id = ?
             GROUP BY rp.user_id
-            ORDER BY total DESC
         """, (chat_id,))
+
         data = []
         for r in rows:
             uid = r["user_id"]
@@ -686,10 +876,81 @@ class PanelHandler(BaseHTTPRequestHandler):
                 nome = first
             else:
                 nome = f"ID {uid}"
-            data.append([nome, uid, r["msgs"], round(r["total"], 2)])
+            msgs = r["msgs"]
+            total = round(r["total"], 2)
+
+            # Aplica filtros
+            ok = True
+            if filtro_user:
+                if filtro_user.lower() not in (username + " " + first).lower():
+                    ok = False
+            if ok and filtro_id:
+                if str(uid) != filtro_id:
+                    ok = False
+            if ok and filtro_msgs_ge:
+                try:
+                    if msgs < int(filtro_msgs_ge):
+                        ok = False
+                except ValueError:
+                    pass
+            if ok and filtro_msgs_le:
+                try:
+                    if msgs > int(filtro_msgs_le):
+                        ok = False
+                except ValueError:
+                    pass
+            if ok and filtro_pts_ge:
+                try:
+                    if total < float(filtro_pts_ge):
+                        ok = False
+                except ValueError:
+                    pass
+            if ok and filtro_pts_le:
+                try:
+                    if total > float(filtro_pts_le):
+                        ok = False
+                except ValueError:
+                    pass
+            if not ok:
+                continue
+
+            data.append([nome, uid, msgs, total])
+
+        filtros_avancados = f"""
+        <div class="card" style="max-width:900px;margin:0 auto 1rem auto">
+          <h3 style="margin-top:0;font-size:0.9rem;color:var(--accent)">Filtro avançado — Participantes</h3>
+          <form method="GET" action="/painel/participantes" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:0.5rem;align-items:end">
+            <input type="hidden" name="chat_id" value="{chat_id}">
+            <div style="display:flex;flex-direction:column">
+              <label style="font-size:0.75rem;color:var(--muted)">Usuário contém</label>
+              <input name="f_user" type="text" value="{escape(filtro_user)}" placeholder="@nome" style="padding:0.35rem;border:1px solid #334155;border-radius:6px;background:#0f172a;color:var(--text);font-size:0.82rem">
+            </div>
+            <div style="display:flex;flex-direction:column">
+              <label style="font-size:0.75rem;color:var(--muted)">ID exato</label>
+              <input name="f_id" type="number" value="{filtro_id}" placeholder="user_id" style="padding:0.35rem;border:1px solid #334155;border-radius:6px;background:#0f172a;color:var(--text);font-size:0.82rem">
+            </div>
+            <div style="display:flex;flex-direction:column;gap:0.25rem">
+              <label style="font-size:0.75rem;color:var(--muted)">Mensagens pontuadas ≥</label>
+              <input name="f_msgs_ge" type="number" value="{filtro_msgs_ge}" placeholder="mín" style="padding:0.35rem;border:1px solid #334155;border-radius:6px;background:#0f172a;color:var(--text);font-size:0.82rem">
+              <label style="font-size:0.75rem;color:var(--muted)">Mensagens pontuadas ≤</label>
+              <input name="f_msgs_le" type="number" value="{filtro_msgs_le}" placeholder="máx" style="padding:0.35rem;border:1px solid #334155;border-radius:6px;background:#0f172a;color:var(--text);font-size:0.82rem">
+            </div>
+            <div style="display:flex;flex-direction:column;gap:0.25rem">
+              <label style="font-size:0.75rem;color:var(--muted)">Pontos totais ≥</label>
+              <input name="f_pts_ge" type="number" step="0.1" value="{filtro_pts_ge}" placeholder="0" style="padding:0.35rem;border:1px solid #334155;border-radius:6px;background:#0f172a;color:var(--text);font-size:0.82rem">
+              <label style="font-size:0.75rem;color:var(--muted)">Pontos totais ≤</label>
+              <input name="f_pts_le" type="number" step="0.1" value="{filtro_pts_le}" placeholder="0" style="padding:0.35rem;border:1px solid #334155;border-radius:6px;background:#0f172a;color:var(--text);font-size:0.82rem">
+            </div>
+            <button class="btn primary" type="submit" style="padding:0.4rem 0.8rem;font-size:0.82rem">Aplicar filtro</button>
+            <a href="/painel/participantes?chat_id={chat_id}" class="btn" style="padding:0.4rem 0.8rem;font-size:0.82rem;text-decoration:none">Limpar</a>
+          </form>
+          <p class="small">Filtre por usuário, ID, mensagens pontuadas e pontos totais.</p>
+        </div>"""
+
         return f"""
         <div class="card">
           <h2>Participantes — grupo {chat_id}</h2>
+          {filtros_avancados}
           {_table(["Usuário", "ID", "Mensagens pontuadas", "Pontos totais"], data, total=len(data))}
         </div>"""
 
@@ -877,12 +1138,31 @@ class PanelHandler(BaseHTTPRequestHandler):
                     arquivos.append([f.name, "—", "—", 0, 0, "<span class='small'>erro ao ler</span>"])
 
         rows = storage.fetchall("SELECT * FROM snapshot_log ORDER BY created_at DESC LIMIT 20")
-        log_rows = [[r["id"], r["chat_id"], r["week_start"], r["file_name"], r["records"], r["uploaded"], r["created_at"]] for r in rows]
+        log_rows = []
+        for r in rows:
+            up = "Sim" if r["uploaded"] else "Não"
+            if r["upload_error"]:
+                up += f" <span class='badge danger' title='{escape(r['upload_error'])}'>erro</span>"
+            elif r["uploaded_at"]:
+                up += f" <span class='badge ok'>ok</span>"
+            import time as _time
+            up_at = _time.strftime("%d/%m %H:%M", _time.localtime(r["uploaded_at"])) if r["uploaded_at"] else "—"
+            log_rows.append([
+                r["id"], r["chat_id"], r["week_start"], r["file_name"],
+                r["records"], up,
+                _time.strftime("%d/%m %H:%M", _time.localtime(r["created_at"])),
+                up_at,
+            ])
+
+        repo_url = self.app.config.get("SNAPSHOT_REPO_URL") if hasattr(self.app, 'config') else None
+        repo_status = "Configurado" if repo_url else "Não configurado"
+        repo_badge = f"<span class='badge ok'>{repo_status}</span>" if repo_url else f"<span class='badge danger'>{repo_status}</span>"
 
         return f"""
         <div class="card">
           <h2>Snapshots semanais</h2>
           <p class="small">Snapshots gerados automaticamente toda segunda-feira para todos os grupos.</p>
+          <p class="small">Repositório de backup remoto: {repo_badge}</p>
           <div style="margin-bottom:0.75rem">
             <form method="POST" action="/painel/snapshots/gerar" style="display:inline">
               <input type="hidden" name="csrf" value="{escape(self._csrf_token() or '')}">
@@ -894,7 +1174,7 @@ class PanelHandler(BaseHTTPRequestHandler):
         </div>
         <div class="card">
           <h2>Log de snapshots (últimos 20)</h2>
-          {_table(["ID", "Chat ID", "Semana", "Arquivo", "Registros", "Enviado", "Criado em"], log_rows, total=len(log_rows)) if log_rows else '<p class="small">Nenhum log ainda.</p>'}
+          {_table(["ID", "Chat ID", "Semana", "Arquivo", "Registros", "Upload remoto", "Criado em", "Enviado em"], log_rows, total=len(log_rows)) if log_rows else '<p class="small">Nenhum log ainda.</p>'}
         </div>"""
 
     def _snapshot_download(self, qs) -> None:

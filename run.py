@@ -10,6 +10,8 @@ import time
 import json
 import threading
 import signal
+import subprocess
+import shutil
 from pathlib import Path
 
 # garante que o pacote bot seja importavel
@@ -35,6 +37,16 @@ def load_env(path: Path) -> dict:
     return env
 
 
+def _load_snapshot_repo_config(config: dict) -> None:
+    global SNAPSHOT_REPO_URL, SNAPSHOT_REPO_BRANCH, SNAPSHOT_REPO_USER, SNAPSHOT_REPO_TOKEN
+    SNAPSHOT_REPO_URL = config.get("SNAPSHOT_REPO_URL") or None
+    SNAPSHOT_REPO_BRANCH = config.get("SNAPSHOT_REPO_BRANCH", "main") or "main"
+    SNAPSHOT_REPO_USER = config.get("SNAPSHOT_REPO_USER") or None
+    SNAPSHOT_REPO_TOKEN = config.get("SNAPSHOT_REPO_TOKEN") or None
+    if SNAPSHOT_REPO_URL:
+        print(f"[snapshot] repo configurado: {SNAPSHOT_REPO_URL} (branch {SNAPSHOT_REPO_BRANCH})")
+
+
 def _ensure_web_user(storage: Storage, config: dict) -> None:
     """Garante usuario web no banco sincronizado com o .env."""
     import hashlib
@@ -53,6 +65,11 @@ def _ensure_web_user(storage: Storage, config: dict) -> None:
 # Snapshot semanal
 # ------------------------------------------------------------------ #
 SNAPSHOT_DIR = HERE / "data" / "snapshots"
+SNAPSHOT_REPO_DIR = HERE / "data" / "snapshot_repo"
+SNAPSHOT_REPO_URL = None  # configurado via env
+SNAPSHOT_REPO_BRANCH = "main"
+SNAPSHOT_REPO_USER = None
+SNAPSHOT_REPO_TOKEN = None
 
 
 def _gerar_snapshot(app: RankingApp) -> int:
@@ -107,12 +124,23 @@ def _gerar_snapshot(app: RankingApp) -> int:
         file_path = SNAPSHOT_DIR / file_name
         file_path.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2), encoding="utf-8")
 
-        # registra no log
+        # registra no log e tenta upload para repositorio remoto
+        uploaded = 0
+        upload_error = None
+        if SNAPSHOT_REPO_URL:
+            ok, err = _upload_snapshot_to_repo(file_path)
+            uploaded = 1 if ok else 0
+            upload_error = err
+            if ok:
+                print(f"[snapshot] upload OK: {file_name}")
+            else:
+                print(f"[snapshot] upload FALHOU: {file_name} -> {err}")
+
         try:
             with storage.transaction() as c:
                 c.execute(
-                    "INSERT OR REPLACE INTO snapshot_log (chat_id, week_start, file_name, records, uploaded, created_at) VALUES (?, ?, ?, ?, 0, ?)",
-                    (chat_id, ws, file_name, len(top10), time.time()),
+                    "INSERT OR REPLACE INTO snapshot_log (chat_id, week_start, file_name, records, uploaded, uploaded_at, upload_error, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    (chat_id, ws, file_name, len(top10), uploaded, time.time() if uploaded else None, upload_error, time.time()),
                 )
         except Exception:
             pass
@@ -120,6 +148,90 @@ def _gerar_snapshot(app: RankingApp) -> int:
         gerados += 1
 
     return gerados
+
+
+def _init_snapshot_repo() -> bool:
+    """Inicializa o repositorio local de snapshots se necessario."""
+    if not SNAPSHOT_REPO_URL:
+        return False
+    SNAPSHOT_REPO_DIR.mkdir(parents=True, exist_ok=True)
+    git_dir = SNAPSHOT_REPO_DIR / ".git"
+    if not git_dir.exists():
+        try:
+            subprocess.run(["git", "init"], cwd=str(SNAPSHOT_REPO_DIR), check=True,
+                           capture_output=True, timeout=30)
+            subprocess.run(["git", "remote", "add", "origin", SNAPSHOT_REPO_URL],
+                           cwd=str(SNAPSHOT_REPO_DIR), check=True, capture_output=True, timeout=30)
+            # configura credenciais via token se disponivel
+            if SNAPSHOT_REPO_TOKEN and SNAPSHOT_REPO_USER:
+                subprocess.run(["git", "config", "user.name", SNAPSHOT_REPO_USER],
+                               cwd=str(SNAPSHOT_REPO_DIR), check=True, capture_output=True)
+                subprocess.run(["git", "config", "user.email", f"{SNAPSHOT_REPO_USER}@users.noreply.github.com"],
+                               cwd=str(SNAPSHOT_REPO_DIR), check=True, capture_output=True)
+            print("[snapshot] repositorio local inicializado")
+        except subprocess.CalledProcessError as e:
+            print(f"[snapshot] erro ao inicializar repo: {e.stderr.decode() if e.stderr else e}")
+            return False
+    return True
+
+
+def _upload_snapshot_to_repo(file_path: Path) -> tuple[bool, str]:
+    """Faz commit e push de um arquivo de snapshot para o repositorio remoto.
+    Retorna (sucesso, mensagem_erro)."""
+    if not SNAPSHOT_REPO_URL:
+        return False, "repositorio nao configurado"
+    if not _init_snapshot_repo():
+        return False, "falha ao inicializar repositorio local"
+
+    try:
+        # copia o arquivo para o repo local
+        dest = SNAPSHOT_REPO_DIR / file_path.name
+        shutil.copy2(str(file_path), str(dest))
+
+        # git add
+        subprocess.run(["git", "add", str(dest.name)], cwd=str(SNAPSHOT_REPO_DIR),
+                       check=True, capture_output=True, timeout=30)
+
+        # git commit (so se houver mudancas)
+        commit_result = subprocess.run(
+            ["git", "commit", "-m", f"snapshot: {dest.name}"],
+            cwd=str(SNAPSHOT_REPO_DIR), capture_output=True, timeout=30
+        )
+        # se nao houver mudancas para commit, nao é erro
+
+        # git push com autenticacao via token
+        env = os.environ.copy()
+        if SNAPSHOT_REPO_TOKEN and SNAPSHOT_REPO_USER:
+            # usa https com token embutido na URL para auth
+            repo_url = SNAPSHOT_REPO_URL
+            if repo_url.startswith("https://"):
+                token_url = repo_url.replace("https://", f"https://{SNAPSHOT_REPO_USER}:{SNAPSHOT_REPO_TOKEN}@")
+                push_result = subprocess.run(
+                    ["git", "push", "origin", f"HEAD:{SNAPSHOT_REPO_BRANCH}"],
+                    cwd=str(SNAPSHOT_REPO_DIR), capture_output=True, timeout=60, env=env
+                )
+                # nao imprime o token em logs
+            else:
+                push_result = subprocess.run(
+                    ["git", "push", "origin", f"HEAD:{SNAPSHOT_REPO_BRANCH}"],
+                    cwd=str(SNAPSHOT_REPO_DIR), capture_output=True, timeout=60, env=env
+                )
+        else:
+            push_result = subprocess.run(
+                ["git", "push", "origin", f"HEAD:{SNAPSHOT_REPO_BRANCH}"],
+                cwd=str(SNAPSHOT_REPO_DIR), capture_output=True, timeout=60, env=env
+            )
+
+        if push_result.returncode != 0:
+            stderr = push_result.stderr.decode("utf-8", errors="replace")
+            # remove possiveis tokens do stderr
+            if SNAPSHOT_REPO_TOKEN:
+                stderr = stderr.replace(SNAPSHOT_REPO_TOKEN, "[TOKEN]")
+            return False, stderr.strip()[:200]
+
+        return True, ""
+    except Exception as e:
+        return False, str(e)[:200]
 
 
 def _snapshot_thread(app: RankingApp, stop_event: threading.Event) -> None:
@@ -162,6 +274,7 @@ def main() -> None:
 
     # Garante usuario web default no banco (senha armazenada em hash simples)
     _ensure_web_user(app.storage, config)
+    _load_snapshot_repo_config(config)
 
     # registra modulo ranking
     man = ranking_manifest.build_manifest()

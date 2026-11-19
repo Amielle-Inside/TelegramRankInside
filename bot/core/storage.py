@@ -162,9 +162,20 @@ class Storage:
                     file_name TEXT NOT NULL,
                     records INTEGER NOT NULL DEFAULT 0,
                     uploaded INTEGER NOT NULL DEFAULT 0,
+                    uploaded_at REAL,
+                    upload_error TEXT,
                     created_at REAL NOT NULL
                 );
             """)
+            # Migracao para bancos existentes: adicionar colunas se nao existirem
+            try:
+                c.execute("ALTER TABLE snapshot_log ADD COLUMN uploaded_at REAL")
+            except Exception:
+                pass
+            try:
+                c.execute("ALTER TABLE snapshot_log ADD COLUMN upload_error TEXT")
+            except Exception:
+                pass
 
 
 def now_utc() -> float:
