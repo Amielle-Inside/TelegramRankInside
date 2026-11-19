@@ -659,7 +659,7 @@ class PanelHandler(BaseHTTPRequestHandler):
 
         # Filtro de semana
         semana_filtro = f"""
-        <div class="card" style="max-width:900px;margin:0 auto 1rem auto">
+        <div class="card" style="margin-bottom:1rem">
           <form method="GET" action="/painel/rankings" style="display:flex;gap:0.5rem;align-items:flex-start;flex-wrap:wrap">
             <input type="hidden" name="chat_id" value="{chat_id}">
             <label style="font-size:0.8rem;color:var(--muted);margin:0;white-space:nowrap">Semana:</label>
@@ -674,7 +674,7 @@ class PanelHandler(BaseHTTPRequestHandler):
 
         # Filtros avançados
         filtros_avancados = f"""
-        <div class="card" style="max-width:900px;margin:0 auto 1rem auto">
+        <div class="card" style="margin-bottom:1rem">
           <h3 style="margin-top:0;font-size:0.9rem;color:var(--accent)">Filtro avançado — Ranking</h3>
           <form method="GET" action="/painel/rankings" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:0.5rem;align-items:end">
             <input type="hidden" name="chat_id" value="{chat_id}">
@@ -801,7 +801,7 @@ class PanelHandler(BaseHTTPRequestHandler):
         )
 
         filtros_avancados = f"""
-        <div class="card" style="max-width:900px;margin:0 auto 1rem auto">
+        <div class="card" style="margin-bottom:1rem">
           <h3 style="margin-top:0;font-size:0.9rem;color:var(--accent)">Filtro avançado — Ciclos</h3>
           <form method="GET" action="/painel/ciclos" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:0.5rem;align-items:end">
             <div style="display:flex;flex-direction:column">
@@ -917,7 +917,7 @@ class PanelHandler(BaseHTTPRequestHandler):
             data.append([nome, uid, msgs, total])
 
         filtros_avancados = f"""
-        <div class="card" style="max-width:900px;margin:0 auto 1rem auto">
+        <div class="card" style="margin-bottom:1rem">
           <h3 style="margin-top:0;font-size:0.9rem;color:var(--accent)">Filtro avançado — Participantes</h3>
           <form method="GET" action="/painel/participantes" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:0.5rem;align-items:end">
             <input type="hidden" name="chat_id" value="{chat_id}">
