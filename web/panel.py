@@ -1107,9 +1107,14 @@ class PanelHandler(BaseHTTPRequestHandler):
         if json_dir.exists():
             for f in sorted(json_dir.glob("*.json"), key=lambda x: x.stat().st_mtime, reverse=True)[:10]:
                 files.append([f.name, f"{f.stat().st_size} bytes", time.ctime(f.stat().st_mtime)])
+        imported = qs.get("imported", [None])[0]
+        imported_alert = ""
+        if imported:
+            imported_alert = _alert("ok", f"{imported} registro(s) importado(s) com sucesso.")
         return f"""
         <div class="card">
           <h2>Exportações JSON</h2>
+          {imported_alert}
           {_table(["Arquivo", "Tamanho", "Gerado em"], files, total=len(files)) if files else '<p class="small">Nenhuma exportação ainda.</p>'}
           <form method="POST" action="/painel/exportar/gerar" style="margin-top:1rem">
             <input type="hidden" name="csrf" value="{escape(self._csrf_token() or '')}">
@@ -1409,7 +1414,7 @@ class PanelHandler(BaseHTTPRequestHandler):
                     (chat_id, uid, ws, pts, time.time()),
                 )
                 imported += 1
-        self._redirect(f"/painel/exportar?chat_id={chat_id}")
+        self._redirect(f"/painel/exportar?chat_id={chat_id}&imported={imported}")
         try:
             with storage.transaction() as c:
                 c.execute(
