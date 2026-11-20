@@ -210,5 +210,45 @@
     <p style="margin-top:0.5rem;font-size:0.8rem;color:#64748b">Dados de exemplo desidentificados. Tokens e senhas nunca são versionados.</p>
   </footer>
 
+  <!-- Lightbox para ampliar prints -->
+  <div class="lightbox" id="lightbox">
+    <span class="close" onclick="closeLightbox()">&times;</span>
+    <img id="lightbox-img" src="" alt="">
+    <div class="caption" id="lightbox-caption"></div>
+  </div>
+
+  <script>
+    // Abre o lightbox ao clicar em qualquer imagem dentro de .screenshot
+    document.addEventListener('click', function (e) {
+      const img = e.target.closest('.screenshot img');
+      if (!img) return;
+      e.preventDefault();
+      const modal = document.getElementById('lightbox');
+      const modalImg = document.getElementById('lightbox-img');
+      const caption = document.getElementById('lightbox-caption');
+      modalImg.src = img.src;
+      modalImg.alt = img.alt || '';
+      caption.textContent = img.alt || '';
+      modal.classList.add('open');
+      document.body.style.overflow = 'hidden';
+    });
+
+    function closeLightbox() {
+      const modal = document.getElementById('lightbox');
+      modal.classList.remove('open');
+      document.body.style.overflow = '';
+    }
+
+    // Fecha clicando fora da imagem
+    document.getElementById('lightbox').addEventListener('click', function (e) {
+      if (e.target === this) closeLightbox();
+    });
+
+    // Fecha com ESC
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') closeLightbox();
+    });
+  </script>
+
 </body>
 </html>

@@ -352,4 +352,53 @@ a:hover { color: var(--accent-hover); }
 }
 
 .terminal .prompt { color: var(--accent); font-weight: 700; }
+
+/* ---------- Lightbox para ampliar prints ---------- */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(11, 16, 22, 0.92);
+  backdrop-filter: blur(6px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  cursor: zoom-out;
+}
+.lightbox.open { display: flex; }
+.lightbox .close {
+  position: absolute;
+  top: 1.5rem;
+  right: 2rem;
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--muted);
+  cursor: pointer;
+  z-index: 1001;
+}
+.lightbox .close:hover { color: var(--text); }
+.lightbox .caption {
+  position: absolute;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.85rem;
+  color: var(--muted);
+  z-index: 1001;
+}
+.lightbox img {
+  max-width: 95vw;
+  max-height: 85vh;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  cursor: zoom-out;
+}
+.screenshot img { cursor: zoom-in; }
+.screenshot img:hover { border-color: var(--accent); }
+
+@media (max-width: 768px) {
+  .lightbox { padding: 1rem; }
+}
 .terminal .output { color: var(--muted); margin-left: 1rem; }
