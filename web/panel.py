@@ -14,6 +14,44 @@ from html import escape
 
 from bot.core.app import RankingApp
 
+# --------------------------------------------------------------------------- #
+# Cache de HTML para paginas estaticas (acelera navecao entre abas)
+# --------------------------------------------------------------------------- #
+_STATIC_CACHE: dict[str, tuple[float, str]] = {}
+_STATIC_TTL = 300  # segundos (5 min)
+
+_PAGINAS_ESTATICAS = {
+    "/painel/regras",
+    "/painel/comandos",
+    "/painel/modulos",
+    "/painel/config",
+}
+
+
+def _cache_key(path: str, chat_id: int | None) -> str:
+    return f"{path}|{chat_id or '-'}"  # chat_id faz parte da chave (seletor de grupos)
+
+
+def _cache_get(key: str) -> str | None:
+    entry = _STATIC_CACHE.get(key)
+    if not entry:
+        return None
+    expires_at, html = entry
+    if time.time() > expires_at:
+        _STATIC_CACHE.pop(key, None)
+        return None
+    return html
+
+
+def _cache_set(key: str, html: str) -> None:
+    _STATIC_CACHE[key] = (time.time() + _STATIC_TTL, html)
+
+
+def _cache_clear() -> None:
+    _STATIC_CACHE.clear()
+
+
+
 
 # --------------------------------------------------------------------------- #
 # Utilitarios de HTML
@@ -328,12 +366,36 @@ class PanelHandler(BaseHTTPRequestHandler):
             self._send_html(200, _page("Ciclos e rodadas", self._ciclos_html(qs), "ciclos", sel_chat_id, chats))
         elif path == "/painel/participantes":
             self._send_html(200, _page("Participantes", self._participantes_html(qs), "participantes", sel_chat_id, chats))
-        elif path == "/painel/regras":
-            self._send_html(200, _page("Pontuação e regras", self._regras_html(), "regras", sel_chat_id, chats))
+        if path == "/painel/regras":
+            ckey = _cache_key(path, sel_chat_id)
+            cached = _cache_get(ckey)
+            if cached is not None:
+                self._send_html(200, _page("Pontuação e regras", cached, "regras", sel_chat_id, chats))
+                return
+            html = self._regras_html()
+            _cache_set(ckey, html)
+            self._send_html(200, _page("Pontuação e regras", html, "regras", sel_chat_id, chats))
+            return
         elif path == "/painel/comandos":
-            self._send_html(200, _page("Comandos e cooldowns", self._comandos_html(), "comandos", sel_chat_id, chats))
+            ckey = _cache_key(path, sel_chat_id)
+            cached = _cache_get(ckey)
+            if cached is not None:
+                self._send_html(200, _page("Comandos e cooldowns", cached, "comandos", sel_chat_id, chats))
+                return
+            html = self._comandos_html()
+            _cache_set(ckey, html)
+            self._send_html(200, _page("Comandos e cooldowns", html, "comandos", sel_chat_id, chats))
+            return
         elif path == "/painel/modulos":
-            self._send_html(200, _page("Módulos", self._modulos_html(), "modulos", sel_chat_id, chats))
+            ckey = _cache_key(path, sel_chat_id)
+            cached = _cache_get(ckey)
+            if cached is not None:
+                self._send_html(200, _page("Módulos", cached, "modulos", sel_chat_id, chats))
+                return
+            html = self._modulos_html()
+            _cache_set(ckey, html)
+            self._send_html(200, _page("Módulos", html, "modulos", sel_chat_id, chats))
+            return
         elif path == "/painel/operacao":
             self._send_html(200, _page("Operação e diagnósticos", self._operacao_html(), "operacao", sel_chat_id, chats))
         elif path == "/painel/exportar":
@@ -346,7 +408,15 @@ class PanelHandler(BaseHTTPRequestHandler):
             self._snapshot_download(qs)
             return
         elif path == "/painel/config":
-            self._send_html(200, _page("Configurações e acesso", self._config_html(qs, is_owner), "config", sel_chat_id, chats))
+            ckey = _cache_key(path, sel_chat_id)
+            cached = _cache_get(ckey)
+            if cached is not None:
+                self._send_html(200, _page("Configurações e acesso", cached, "config", sel_chat_id, chats))
+                return
+            html = self._config_html(qs, is_owner)
+            _cache_set(ckey, html)
+            self._send_html(200, _page("Configurações e acesso", html, "config", sel_chat_id, chats))
+            return
         else:
             self._send_html(404, _page("Não encontrado", "<p>Página não encontrada.</p>", chats=chats))
 
@@ -381,8 +451,10 @@ class PanelHandler(BaseHTTPRequestHandler):
 
         if path == "/painel/config/salvar":
             self._config_salvar(body_params, is_owner)
+            _cache_clear()
         elif path == "/painel/config/resetar":
             self._config_resetar(body_params, is_owner)
+            _cache_clear()
         elif path == "/painel/exportar/gerar":
             self._exportar_gerar(body_params)
         elif path == "/painel/exportar/importar":
