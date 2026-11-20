@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500" viewBox="0 0 800 500">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0b1016"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#17212d"/>
+      <stop offset="100%" stop-color="#131a24"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="500" fill="url(#bg)" rx="16"/>
+  <rect x="240" y="80" width="320" height="340" fill="url(#card)" stroke="#25303d" stroke-width="1" rx="12"/>
+  <text x="400" y="130" text-anchor="middle" font-family="system-ui, sans-serif" font-size="22" font-weight="800" fill="#e7e6e5">Entrar no painel</text>
+  <text x="400" y="156" text-anchor="middle" font-family="system-ui, sans-serif" font-size="14" fill="#94a3b8">Admin do TelegramRankInside</text>
+  <rect x="280" y="178" width="240" height="40" fill="#0f172a" stroke="#334155" stroke-width="1" rx="6"/>
+  <text x="295" y="202" font-family="system-ui, sans-serif" font-size="13" fill="#e7e6e5">Usuário</text>
+  <rect x="280" y="230" width="240" height="40" fill="#0f172a" stroke="#334155" stroke-width="1" rx="6"/>
+  <text x="295" y="254" font-family="system-ui, sans-serif" font-size="13" fill="#e7e6e5">Senha ••••••••</text>
+  <rect x="280" y="284" width="240" height="40" fill="#38bdf8" rx="6"/>
+  <text x="400" y="308" text-anchor="middle" font-family="system-ui, sans-serif" font-size="14" font-weight="700" fill="#0b1016">Acessar painel</text>
+  <rect x="300" y="336" width="200" height="20" fill="none"/>
+  <text x="400" y="352" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" fill="#64748b">Lembrar-me (30 dias)</text>
+  <text x="400" y="380" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" fill="#94a3b8">Somente localhost • 127.0.0.1:2020</text>
+</svg>

@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500" viewBox="0 0 800 500">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0b1016"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#17212d"/>
+      <stop offset="100%" stop-color="#131a24"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="500" fill="url(#bg)" rx="16"/>
+  <!-- Header -->
+  <rect x="30" y="30" width="740" height="60" fill="#131a24" stroke="#25303d" stroke-width="1" rx="8"/>
+  <circle cx="50" cy="60" r="10" fill="#38bdf8"/>
+  <text x="70" y="66" font-family="system-ui" font-size="16" font-weight="700" fill="#e7e6e5">TelegramRankInside</text>
+  <text x="250" y="66" font-family="system-ui" font-size="13" fill="#94a3b8">██████████████████████</text>
+  <rect x="600" y="35" width="150" height="34" fill="#38bdf8" rx="6"/>
+  <text x="675" y="57" text-anchor="middle" font-family="system-ui" font-size="13" font-weight="700" fill="#0b1016">Painel (localhost)</text>
+
+  <!-- Stats grid -->
+  <g transform="translate(30, 110)">
+    <text x="0" y="0" font-family="system-ui" font-size="14" font-weight="700" fill="#e7e6e5">Visão geral</text>
+    <g transform="translate(0, 30)">
+      <rect width="175" height="120" fill="url(#card)" stroke="#25303d" stroke-width="1" rx="8"/>
+      <text x="15" y="30" font-family="system-ui" font-size="28" font-weight="800" fill="#38bdf8">592</text>
+      <text x="15" y="55" font-family="system-ui" font-size="12" fill="#94a3b8">Mensagens armazenadas</text>
+      <rect x="200" y="0" width="175" height="120" fill="url(#card)" stroke="#25303d" stroke-width="1" rx="8"/>
+      <text x="215" y="30" font-family="system-ui" font-size="28" font-weight="800" fill="#38bdf8">335</text>
+      <text x="215" y="55" font-family="system-ui" font-size="12" fill="#94a3b8">Lançamentos de pontos</text>
+    </g>
+    <g transform="translate(0, 170)">
+      <rect width="175" height="120" fill="url(#card)" stroke="#25303d" stroke-width="1" rx="8"/>
+      <text x="15" y="30" font-family="system-ui" font-size="28" font-weight="800" fill="#38bdf8">14</text>
+      <text x="15" y="55" font-family="system-ui" font-size="12" fill="#94a3b8">Usuários únicos</text>
+      <rect x="200" y="0" width="175" height="120" fill="url(#card)" stroke="#25303d" stroke-width="1" rx="8"/>
+      <text x="215" y="30" font-family="system-ui" font-size="28" font-weight="800" fill="#38bdf8">2</text>
+      <text x="215" y="55" font-family="system-ui" font-size="12" fill="#94a3b8">Grupos monitorados</text>
+    </g>
+    <g transform="translate(0, 310)">
+      <rect width="175" height="120" fill="url(#card)" stroke="#25303d" stroke-width="1" rx="8"/>
+      <circle cx="25" cy="30" r="8" fill="#22c55e"/>
+      <text x="45" y="35" font-family="system-ui" font-size="13" fill="#e7e6e5">Bot em execução</text>
+      <rect x="200" y="0" width="175" height="120" fill="url(#card)" stroke="#25303d" stroke-width="1" rx="8"/>
+      <text x="215" y="30" font-family="system-ui" font-size="16" font-weight="800" fill="#e7e6e5">127.0.0.1:2020</text>
+      <text x="215" y="55" font-family="system-ui" font-size="12" fill="#94a3b8">Painel (localhost)</text>
+    </g>
+  </g>
+
+  <!-- Ciclo -->
+  <g transform="translate(30, 440)">
+    <rect width="740" height="40" fill="#131a24" stroke="#25303d" stroke-width="1" rx="8"/>
+    <text x="15" y="25" font-family="system-ui" font-size="13" font-weight="700" fill="#e7e6e5">Ciclo ativo: #████████</text>
+    <text x="300" y="25" font-family="system-ui" font-size="13" fill="#94a3b8">Término estimado: dd/mm/yyyy HH:MM</text>
+    <text x="620" y="25" font-family="system-ui" font-size="13" fill="#22c55e">● Online</text>
+  </g>
+</svg>

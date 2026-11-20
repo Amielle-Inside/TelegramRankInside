@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TelegramRankInside — Painel de ranqueamento para grupos do Telegram</title>
+  <meta name="description" content="Bot de ranqueamento para supergrupos do Telegram com painel web, filtros avançados, snapshots semanais e auditoria completa.">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="brand">
+        <div class="logo">T<span style="font-size:0.75rem">RI</span></div>
+        <div>Telegram<span style="color:var(--accent)">RankInside</span></div>
+      </div>
+      <nav class="nav-links">
+        <a href="#sobre">Sobre</a>
+        <a href="#funcionalidades">Funcionalidades</a>
+        <a href="#prints">Interface</a>
+        <a href="#tecnologia">Tecnologia</a>
+        <a href="#uso">Como usar</a>
+      </nav>
+      <a href="https://github.com/Amielle-Inside/TelegramRankInside" class="btn-primary" target="_blank" rel="noopener">Ver no GitHub</a>
+    </div>
+  </header>
+
+  <!-- Hero -->
+  <section class="hero">
+    <h1>Ranqueamento de participação<br>para grupos do Telegram</h1>
+    <p>Bot completo para supergrupos com sistema de pontos, pódio semanal, ciclos de rotação, painel web administrativo, filtros avançados, auditoria de eventos e snapshot semanal com backup automático em repositório privado.</p>
+    <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;margin-top:2rem">
+      <span class="badge ok">Python stdlib</span>
+      <span class="badge ok">SQLite WAL</span>
+      <span class="badge ok">Painel web localhost</span>
+      <span class="badge ok">Snapshot semanal</span>
+      <span class="badge ok">GitHub Pages</span>
+    </div>
+  </section>
+
+  <!-- Sobre -->
+  <section class="section" id="sobre">
+    <div class="section-title"><div class="dot"></div><span>Sobre o projeto</span></div>
+    <div class="grid-2">
+      <div class="card">
+        <h3>O que é</h3>
+        <p>O <strong>TelegramRankInside</strong> é um bot para supergrupos do Telegram que registra mensagens, lança pontos e gera um ranking semanal de participação. Ideal para comunidades que querem engajar membros com um minigame de ranqueamento.</p>
+      </div>
+      <div class="card">
+        <h3>Arquitetura</h3>
+        <p>Escrito em Python puro (stdlib only), sem dependências externas. Persistência em SQLite com WAL mode. Painel administrativo web rodando apenas em localhost, com autenticação por sessão e cookie persistente opcional.</p>
+      </div>
+      <div class="card">
+        <h3>Privacidade</h3>
+        <p>O painel web é exposto somente em <code>127.0.0.1</code>. Tokens, senhas e credenciais nunca são commitados — ficam em <code>config/config.env</code> (gitignorado). Dados de usuários usam <code>user_id</code> como identidade, nunca <code>@username</code> exposto publicamente.</p>
+      </div>
+      <div class="card">
+        <h3>Licença</h3>
+        <p>Projeto open source. Código disponível no GitHub sob a organização <strong>Amielle-Inside</strong>. Repositório principal público; backups de snapshot em repositório privado dedicado.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Funcionalidades -->
+  <section class="section" id="funcionalidades">
+    <div class="section-title"><div class="dot"></div><span>Funcionalidades</span></div>
+    <div class="features">
+      <div class="feature">
+        <span class="tag">Ranking</span>
+        <h4>Ranking semanal</h4>
+        <p>Top 10 de participantes por semana com pontos acumulados, pódio rotativo (🥇 🥈 🥉) e filtro por posição, usuário, ID ou pontos.</p>
+      </div>
+      <div class="feature">
+        <span class="tag">Ciclos</span>
+        <h4>Ciclos de rotação</h4>
+        <p>Ciclos com início e término estimado, participantes elegíveis e pódios por ciclo. O ciclo encerra quando todos passarem pelo top 3.</p>
+      </div>
+      <div class="feature">
+        <span class="tag">Participantes</span>
+        <h4>Participantes</h4>
+        <p>Lista de todos os participantes com mensagens pontuadas, pontos totais, nome de usuário e ID. Filtros avançados por todos os campos.</p>
+      </div>
+      <div class="feature">
+        <span class="tag">Auditoria</span>
+        <h4>Auditoria completa</h4>
+        <p>Log de todas as execuções de <code>!check</code> nos grupos: se foi auditado, o que foi auditado, quem ganhou ou perdeu pontos, com parâmetros legíveis.</p>
+      </div>
+      <div class="feature">
+        <span class="tag">Snapshot</span>
+        <h4>Snapshot semanal</h4>
+        <p>Geração automática de snapshots JSON para todos os grupos, com upload para repositório privado dedicado e status de upload no painel.</p>
+      </div>
+      <div class="feature">
+        <span class="tag">Módulos</span>
+        <h4>Módulos versionados</h4>
+        <p>Cada módulo tem versão própria (não mais estático em 1.0), lida dinamicamente de um arquivo <code>VERSION</code> na raiz do projeto.</p>
+      </div>
+      <div class="feature">
+        <span class="tag">Login</span>
+        <h4>Login persistente</h4>
+        <p>Painel web com autenticação por sessão e opção "Lembrar-me" (cookie de 30 dias). Acesso restrito a localhost.</p>
+      </div>
+      <div class="feature">
+        <span class="tag">Grupos</span>
+        <h4>Seletor integrado</h4>
+        <p>Seletor de grupos integrado ao menu de navegação, aparecendo em todas as páginas do painel com layout consistente.</p>
+      </div>
+      <div class="feature">
+        <span class="tag">Layout</span>
+        <h4>Interface alinhada</h4>
+        <p>Todos os cards, filtros e tabelas centralizados com largura máxima consistente e navegação rápida entre abas.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Prints da interface -->
+  <section class="section" id="prints">
+    <div class="section-title"><div class="dot"></div><span>Interface web do painel</span></div>
+    <p class="small" style="margin-bottom:1.5rem;text-align:center;color:var(--muted)">Prints representativos da interface (dados sensíveis desidentificados com ████████).</p>
+    <div class="screenshots">
+      <figure class="screenshot">
+        <img src="assets/prints/login.svg" alt="Tela de login do painel web">
+        <figcaption>Login — autenticação com opção "Lembrar-me" (30 dias)</figcaption>
+      </figure>
+      <figure class="screenshot">
+        <img src="assets/prints/overview.svg" alt="Visão geral do painel">
+        <figcaption>Visão geral — estatísticas, ciclo atual e grupos monitorados</figcaption>
+      </figure>
+      <figure class="screenshot">
+        <img src="assets/prints/rankings.svg" alt="Tela de rankings">
+        <figcaption>Rankings — filtro avançado, pódio semanal e Top 10</figcaption>
+      </figure>
+      <figure class="screenshot">
+        <img src="assets/prints/cycles.svg" alt="Tela de ciclos">
+        <figcaption>Ciclos — término estimado, rodadas e filtros avançados</figcaption>
+      </figure>
+      <figure class="screenshot">
+        <img src="assets/prints/participants.svg" alt="Tela de participantes">
+        <figcaption>Participantes — lista com mensagens, pontos e filtros</figcaption>
+      </figure>
+      <figure class="screenshot">
+        <img src="assets/prints/audit.svg" alt="Tela de auditoria">
+        <figcaption>Auditoria — log de !check com resultados e pontos</figcaption>
+      </figure>
+      <figure class="screenshot">
+        <img src="assets/prints/snapshots.svg" alt="Tela de snapshots">
+        <figcaption>Snapshots — geração, upload e log de backup remoto</figcaption>
+      </figure>
+      <figure class="screenshot">
+        <img src="assets/prints/modules.svg" alt="Tela de módulos">
+        <figcaption>Módulos — lista com versão e estado de cada módulo</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- Tecnologia -->
+  <section class="section" id="tecnologia">
+    <div class="section-title"><div class="dot"></div><span>Tecnologia</span></div>
+    <div class="tech">
+      <span>Python 3.12</span>
+      <span>SQLite (WAL)</span>
+      <span>http.server</span>
+      <span>Telegram Bot API</span>
+      <span>GitHub Actions</span>
+      <span>GitHub Pages</span>
+      <span>CSS puro</span>
+      <span>SVG</span>
+    </div>
+  </section>
+
+  <!-- Como usar -->
+  <section class="section" id="uso">
+    <div class="section-title"><div class="dot"></div><span>Como usar</span></div>
+    <div class="grid-2">
+      <div class="card">
+        <h3>1. Instalação</h3>
+        <div class="terminal">
+          <div class="prompt">$</div> <div class="output">git clone https://github.com/Amielle-Inside/TelegramRankInside.git</div>
+          <div class="prompt">$</div> <div class="output">cd TelegramRankInside</div>
+          <div class="prompt">$</div> <div class="output">cp .env.example config/config.env</div>
+          <div class="prompt">$</div> <div class="output">python3 run.py</div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>2. Painel web</h3>
+        <p>Acesse <code>http://127.0.0.1:2020/painel/</code> (somente localhost). Login com usuário e senha definidos em <code>config/config.env</code>.</p>
+      </div>
+      <div class="card">
+        <h3>3. Comandos no grupo</h3>
+        <ul style="color:var(--muted);font-size:0.9rem;padding-left:1.2rem">
+          <li><code>!rank</code> — ranking semanal</li>
+          <li><code>!rciclo</code> — ciclo atual</li>
+          <li><code>!pontos</code> — meus pontos</li>
+          <li><code>!regras</code> — como funciona</li>
+          <li><code>!check</code> — auditoria (admin)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>4. Snapshot</h3>
+        <p>Gere snapshots semanais no painel. Eles são enviados automaticamente para um repositório privado dedicado no GitHub.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <p>TelegramRankInside — Desenvolvido por <strong>Amielle-Inside</strong> &middot; Código no <a href="https://github.com/Amielle-Inside/TelegramRankInside" target="_blank" rel="noopener">GitHub</a> &middot; Painel somente localhost</p>
+    <p style="margin-top:0.5rem;font-size:0.8rem;color:#64748b">Dados de exemplo desidentificados. Tokens e senhas nunca são versionados.</p>
+  </footer>
+
+</body>
+</html>

@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500" viewBox="0 0 800 500">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0b1016"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#17212d"/>
+      <stop offset="100%" stop-color="#131a24"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="500" fill="url(#bg)" rx="16"/>
+
+  <rect x="30" y="20" width="740" height="50" fill="#131a24" stroke="#25303d" stroke-width="1" rx="8"/>
+  <text x="50" y="46" font-family="system-ui" font-size="14" font-weight="700" fill="#38bdf8">Snapshots</text>
+
+  <!-- Status repo -->
+  <g transform="translate(30, 90)">
+    <rect width="740" height="80" fill="url(#card)" stroke="#25303d" stroke-width="1" rx="8"/>
+    <text x="20" y="25" font-family="system-ui" font-size="13" font-weight="700" fill="#e7e6e5">Repositório de backup remoto</text>
+    <rect x="20" y="45" width="400" height="26" fill="#0f172a" stroke="#22c55e" stroke-width="1" rx="4"/>
+    <text x="30" y="64" font-family="system-ui" font-size="12" fill="#22c55e">● Configurado</text>
+    <text x="60" y="64" font-family="system-ui" font-size="12" fill="#94a3b8">██████████████████████████████████████</text>
+    <text x="460" y="64" font-family="system-ui" font-size="12" fill="#e7e6e5">branch: main</text>
+  </g>
+
+  <!-- Gerar snapshot -->
+  <g transform="translate(30, 190)">
+    <rect width="740" height="80" fill="url(#card)" stroke="#25303d" stroke-width="1" rx="8"/>
+    <text x="20" y="25" font-family="system-ui" font-size="13" font-weight="700" fill="#e7e6e5">Gerar snapshot agora</text>
+    <rect x="20" y="50" width="200" height="34" fill="#38bdf8" rx="6"/>
+    <text x="120" y="72" text-anchor="middle" font-family="system-ui" font-size="13" font-weight="700" fill="#0b1016">Gerar snapshot</text>
+    <rect x="230" y="50" width="200" height="34" fill="#0f172a" stroke="#334155" stroke-width="1" rx="6"/>
+    <text x="330" y="72" text-anchor="middle" font-family="system-ui" font-size="13" fill="#94a3b8">Upload semanal: Ativo</text>
+  </g>
+
+  <!-- Arquivos disponíveis -->
+  <g transform="translate(30, 290)">
+    <rect width="740" height="100" fill="url(#card)" stroke="#25303d" stroke-width="1" rx="8"/>
+    <text x="20" y="25" font-family="system-ui" font-size="13" font-weight="700" fill="#e7e6e5">Arquivos disponíveis</text>
+    <rect x="20" y="45" width="700" height="26" fill="#0f172a" stroke="#25303d" stroke-width="1" rx="4"/>
+    <text x="30" y="64" font-family="system-ui" font-size="11" fill="#64748b">Arquivo</text>
+    <text x="300" y="64" font-family="system-ui" font-size="11" fill="#64748b">Tamanho</text>
+    <text x="450" y="64" font-family="system-ui" font-size="11" fill="#64748b">Enviado em</text>
+    <text x="40" y="90" font-family="system-ui" font-size="12" fill="#e7e6e5">snapshot_████████████████_2026-11-16.json</text>
+    <text x="290" y="90" font-family="system-ui" font-size="12" fill="#e7e6e5">████ bytes</text>
+    <text x="440" y="90" font-family="system-ui" font-size="12" fill="#e7e6e5">dd/mm/yyyy HH:MM</text>
+    <text x="40" y="116" font-family="system-ui" font-size="12" fill="#e7e6e5">snapshot_████████████████_2026-11-09.json</text>
+    <text x="290" y="116" font-family="system-ui" font-size="12" fill="#e7e6e5">████ bytes</text>
+    <text x="440" y="116" font-family="system-ui" font-size="12" fill="#e7e6e5">dd/mm/yyyy HH:MM</text>
+  </g>
+
+  <!-- Log upload -->
+  <g transform="translate(30, 410)">
+    <rect width="740" height="60" fill="url(#card)" stroke="#25303d" stroke-width="1" rx="8"/>
+    <text x="20" y="25" font-family="system-ui" font-size="13" font-weight="700" fill="#e7e6e5">Log de snapshots</text>
+    <text x="20" y="48" font-family="system-ui" font-size="12" fill="#e7e6e5">▸ 2026-11-16 — 2 arquivo(s) gerado(s) e enviado(s) para o repositório remoto</text>
+    <text x="450" y="48" font-family="system-ui" font-size="12" fill="#22c55e">● Upload OK</text>
+  </g>
+</svg>

@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500" viewBox="0 0 800 500">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0b1016"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#17212d"/>
+      <stop offset="100%" stop-color="#131a24"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="500" fill="url(#bg)" rx="16"/>
+
+  <rect x="30" y="20" width="740" height="50" fill="#131a24" stroke="#25303d" stroke-width="1" rx="8"/>
+  <text x="50" y="46" font-family="system-ui" font-size="14" font-weight="700" fill="#38bdf8">Participantes</text>
+  <text x="150" y="46" font-family="system-ui" font-size="13" fill="#94a3b8">Grupo: ████████████████</text>
+
+  <!-- Filtros participantes -->
+  <g transform="translate(30, 90)">
+    <rect width="740" height="100" fill="url(#card)" stroke="#25303d" stroke-width="1" rx="8"/>
+    <text x="20" y="25" font-family="system-ui" font-size="13" font-weight="700" fill="#38bdf8">Filtro avançado — Participantes</text>
+    <text x="20" y="55" font-family="system-ui" font-size="12" fill="#94a3b8">Usuário contém:</text>
+    <rect x="120" y="40" width="160" height="24" fill="#0f172a" stroke="#334155" stroke-width="1" rx="4"/>
+    <text x="300" y="55" font-family="system-ui" font-size="12" fill="#94a3b8">ID exato:</text>
+    <rect x="360" y="40" width="100" height="24" fill="#0f172a" stroke="#334155" stroke-width="1" rx="4"/>
+    <text x="480" y="55" font-family="system-ui" font-size="12" fill="#94a3b8">Mensagens ≥ / ≤:</text>
+    <rect x="590" y="40" width="60" height="24" fill="#0f172a" stroke="#334155" stroke-width="1" rx="4"/>
+    <rect x="660" y="40" width="60" height="24" fill="#0f172a" stroke="#334155" stroke-width="1" rx="4"/>
+    <text x="20" y="90" font-family="system-ui" font-size="12" fill="#94a3b8">Pontos totais ≥ / ≤:</text>
+    <rect x="140" y="75" width="60" height="24" fill="#0f172a" stroke="#334155" stroke-width="1" rx="4"/>
+    <rect x="210" y="75" width="60" height="24" fill="#0f172a" stroke="#334155" stroke-width="1" rx="4"/>
+  </g>
+
+  <!-- Tabela participantes -->
+  <g transform="translate(30, 210)">
+    <rect width="740" height="260" fill="url(#card)" stroke="#25303d" stroke-width="1" rx="8"/>
+    <text x="20" y="25" font-family="system-ui" font-size="13" font-weight="700" fill="#e7e6e5">Lista de participantes</text>
+    <rect x="20" y="45" width="700" height="26" fill="#0f172a" stroke="#25303d" stroke-width="1" rx="4"/>
+    <text x="30" y="64" font-family="system-ui" font-size="11" fill="#64748b">Usuário</text>
+    <text x="180" y="64" font-family="system-ui" font-size="11" fill="#64748b">ID</text>
+    <text x="280" y="64" font-family="system-ui" font-size="11" fill="#64748b">Mensagens pontuadas</text>
+    <text x="450" y="64" font-family="system-ui" font-size="11" fill="#64748b">Pontos totais</text>
+    <text x="40" y="90" font-family="system-ui" font-size="12" fill="#e7e6e5">████████</text>
+    <text x="170" y="90" font-family="system-ui" font-size="12" fill="#e7e6e5">██████████</text>
+    <text x="270" y="90" font-family="system-ui" font-size="12" fill="#e7e6e5">███</text>
+    <text x="440" y="90" font-family="system-ui" font-size="12" fill="#38bdf8" font-weight="700">██████.█</text>
+    <text x="40" y="116" font-family="system-ui" font-size="12" fill="#e7e6e5">████████</text>
+    <text x="170" y="116" font-family="system-ui" font-size="12" fill="#e7e6e5">██████████</text>
+    <text x="270" y="116" font-family="system-ui" font-size="12" fill="#e7e6e5">███</text>
+    <text x="440" y="116" font-family="system-ui" font-size="12" fill="#38bdf8" font-weight="700">██████.█</text>
+    <text x="40" y="142" font-family="system-ui" font-size="12" fill="#e7e6e5">████████</text>
+    <text x="170" y="142" font-family="system-ui" font-size="12" fill="#e7e6e5">██████████</text>
+    <text x="270" y="142" font-family="system-ui" font-size="12" fill="#e7e6e5">███</text>
+    <text x="440" y="142" font-family="system-ui" font-size="12" fill="#38bdf8" font-weight="700">██████.█</text>
+    <text x="40" y="168" font-family="system-ui" font-size="12" fill="#e7e6e5">████████</text>
+    <text x="170" y="168" font-family="system-ui" font-size="12" fill="#e7e6e5">██████████</text>
+    <text x="270" y="168" font-family="system-ui" font-size="12" fill="#e7e6e5">███</text>
+    <text x="440" y="168" font-family="system-ui" font-size="12" fill="#38bdf8" font-weight="700">██████.█</text>
+    <text x="40" y="194" font-family="system-ui" font-size="12" fill="#e7e6e5">████████</text>
+    <text x="170" y="194" font-family="system-ui" font-size="12" fill="#e7e6e5">██████████</text>
+    <text x="270" y="194" font-family="system-ui" font-size="12" fill="#e7e6e5">███</text>
+    <text x="440" y="194" font-family="system-ui" font-size="12" fill="#38bdf8" font-weight="700">██████.█</text>
+    <text x="380" y="230" font-family="system-ui" font-size="11" fill="#64748b">██ participante(s) corresponde(m) ao(s) filtro(s).</text>
+  </g>
+</svg>
