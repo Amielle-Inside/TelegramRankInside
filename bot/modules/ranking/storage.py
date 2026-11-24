@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import time
 from bot.core.storage import Storage
 
 
@@ -104,3 +106,110 @@ def week_start_for(ts_unix: int, tz_name: str = "America/Sao_Paulo") -> str:
     # segunda-feira = 0
     monday = dt - timedelta(days=dt.weekday())
     return monday.strftime("%Y-%m-%d")
+
+
+def sunday_end_for(ts_unix: int, tz_name: str = "America/Sao_Paulo") -> str:
+    """Retorna YYYY-MM-DD do domingo da semana do timestamp (SP)."""
+    from datetime import datetime, timezone, timedelta
+    try:
+        import zoneinfo
+        tz = zoneinfo.ZoneInfo(tz_name)
+    except Exception:
+        tz = timezone(timedelta(hours=-3))
+    dt = datetime.fromtimestamp(ts_unix, tz=tz)
+    sunday = dt + timedelta(days=(6 - dt.weekday()))
+    return sunday.strftime("%Y-%m-%d")
+
+
+def ensure_week_round(storage: Storage, week_start: str) -> None:
+    """Garante que exista uma rodada aberta para a semana dada."""
+    row = storage.fetchone("SELECT week_start, state FROM ranking_rounds WHERE week_start = ?", (week_start,))
+    if not row:
+        storage.execute(
+            "INSERT INTO ranking_rounds (week_start, state, rules_version) VALUES (?, 'open', '1.1.0')",
+            (week_start,),
+        )
+    elif row["state"] != "open":
+        storage.execute(
+            "UPDATE ranking_rounds SET state = 'open' WHERE week_start = ?",
+            (week_start,),
+        )
+
+
+def close_week_round(storage: Storage, week_start: str) -> list[dict]:
+    """Fecha a rodada da semana, gera pódio (top 3) e retorna o pódio."""
+    # fecha rodada
+    storage.execute(
+        "UPDATE ranking_rounds SET state = 'closed', closed_at = ? WHERE week_start = ?",
+        (time.time(), week_start),
+    )
+    # top 3 por pontos naquela semana
+    top = storage.fetchall("""
+        SELECT user_id, SUM(points) as total
+        FROM ranking_points
+        WHERE week_start = ? AND points > 0
+        GROUP BY user_id
+        ORDER BY total DESC, user_id ASC
+        LIMIT 3
+    """, (week_start,))
+    # insere pódios
+    for pos, r in enumerate(top, start=1):
+        storage.execute(
+            "INSERT INTO ranking_podiums (cycle_id, week_start, position, user_id, points) VALUES (?, ?, ?, ?, ?)",
+            (f"cycle-{week_start[:4]}-{week_start[5:7]}", week_start, pos, r["user_id"], r["total"]),
+        )
+    return top
+
+
+def current_cycle(storage: Storage) -> dict | None:
+    """Retorna o ciclo ativo ou o mais recente."""
+    row = storage.fetchone("SELECT * FROM ranking_cycles WHERE state = 'active' ORDER BY started_at DESC LIMIT 1")
+    if not row:
+        row = storage.fetchone("SELECT * FROM ranking_cycles ORDER BY started_at DESC LIMIT 1")
+    if not row:
+        return None
+    return dict(row)
+
+
+def ensure_cycle(storage: Storage, cycle_id: str) -> None:
+    """Garante que exista um ciclo ativo."""
+    row = storage.fetchone("SELECT cycle_id, state FROM ranking_cycles WHERE cycle_id = ?", (cycle_id,))
+    if not row:
+        storage.execute(
+            "INSERT INTO ranking_cycles (cycle_id, started_at, state, participants) VALUES (?, ?, 'active', '[]')",
+            (cycle_id, time.time()),
+        )
+    elif row["state"] != "active":
+        storage.execute(
+            "UPDATE ranking_cycles SET state = 'active' WHERE cycle_id = ?",
+            (cycle_id,),
+        )
+
+
+def close_cycle_and_start_new(storage: Storage, old_cycle_id: str, new_cycle_id: str) -> None:
+    """Fecha o ciclo antigo e inicia um novo com rodízio de pódio."""
+    # fecha ciclo antigo
+    storage.execute(
+        "UPDATE ranking_cycles SET state = 'closed' WHERE cycle_id = ?",
+        (old_cycle_id,),
+    )
+    # calcula quem já teve pódio no ciclo antigo (para rodízio no novo)
+    podium_users = storage.fetchall("""
+        SELECT DISTINCT user_id FROM ranking_podiums WHERE cycle_id = ?
+    """, (old_cycle_id,))
+    podium_ids = {r["user_id"] for r in podium_users}
+    # todos os usuários que pontuaram no ciclo antigo (aprox: nas últimas 4 semanas)
+    all_users = storage.fetchall("""
+        SELECT DISTINCT user_id FROM ranking_points
+        WHERE cycle_id = ?
+    """, (old_cycle_id,))
+    all_ids = [r["user_id"] for r in all_users]
+    # rodízio: quem ainda não teve pódio entra primeiro; quem já teve, depois
+    without_podium = [u for u in all_ids if u not in podium_ids]
+    with_podium = [u for u in all_ids if u in podium_ids]
+    new_participants = without_podium + with_podium
+    import json
+    storage.execute(
+        "INSERT INTO ranking_cycles (cycle_id, started_at, state, participants) VALUES (?, ?, 'active', ?)",
+        (new_cycle_id, time.time(), json.dumps(new_participants)),
+    )

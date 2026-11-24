@@ -13,6 +13,10 @@ from bot.core.commands import CommandRegistry, Command
 from bot.core.permissions import Permissions
 from bot.core.cooldowns import CooldownManager
 from bot.core.modules import ModuleManager, ModuleManifest
+from bot.modules.ranking.storage import (
+    week_start_for, sunday_end_for, ensure_week_round, close_week_round,
+    current_cycle, ensure_cycle, close_cycle_and_start_new,
+)
 
 
 class RankingApp:
@@ -31,6 +35,7 @@ class RankingApp:
         self.modules = ModuleManager()
         self._running = False
         self._lock = threading.Lock()
+        self._last_schedule_check = 0.0
 
     def register_core_commands(self) -> None:
         # Comandos administrativos (registrados aqui, mas tratados por modulos quando existirem)
@@ -70,15 +75,78 @@ class RankingApp:
         if handler and msg:
             handler.handle_message(msg, msg.get("chat", {}).get("id"))
 
+    def _check_schedule(self) -> None:
+        """Fecha rodada semanal (domingo 23:59 SP) e ciclo mensal (4 semanas)."""
+        now = time.time()
+        if now - self._last_schedule_check < 60:
+            return
+        self._last_schedule_check = now
+
+        from datetime import datetime, timezone, timedelta
+        try:
+            import zoneinfo
+            tz = zoneinfo.ZoneInfo("America/Sao_Paulo")
+        except Exception:
+            tz = timezone(timedelta(hours=-3))
+        now_dt = datetime.fromtimestamp(now, tz=tz)
+        today = now_dt.strftime("%Y-%m-%d")
+        today_weekday = now_dt.weekday()  # 0=segunda, 6=domingo
+
+        # Verifica se passou o domingo 23:59 SP da semana anterior
+        # Se hoje é segunda-feira (0) e já passou um pouco, ou domingo após 23:59
+        current_week = week_start_for(int(now))
+        last_week_dt = now_dt - timedelta(days=7)
+        last_week = last_week_dt.strftime("%Y-%m-%d")
+
+        # Fecha rodada da semana anterior se ainda estiver aberta
+        row = self.storage.fetchone(
+            "SELECT week_start, state FROM ranking_rounds WHERE week_start = ?",
+            (last_week,),
+        )
+        if row and row["state"] == "open":
+            # só fecha se já passou do domingo 23:59 daquela semana
+            sunday_of_last_week = last_week_dt + timedelta(days=(6 - last_week_dt.weekday()))
+            sunday_end_ts = datetime(
+                sunday_of_last_week.year, sunday_of_last_week.month, sunday_of_last_week.day,
+                23, 59, 0, tzinfo=tz,
+            ).timestamp()
+            if now >= sunday_end_ts:
+                podium = close_week_round(self.storage, last_week)
+                if podium:
+                    nomes = []
+                    for p in podium:
+                        nomes.append(f"usuario `{p['user_id']}` ({p['total']:.1f}pts)")
+                    self.telegram.send_message(
+                        -1002267119439,  # NewsInside Chat
+                        f"*Rodada encerrada: {last_week}*\nPodio:\n" + "\n".join(
+                            f"{i+1}. {n}" for i, n in enumerate(nomes)
+                        ),
+                    )
+
+        # Verifica ciclo mensal (4 semanas)
+        cycle = current_cycle(self.storage)
+        if cycle:
+            # conta semanas fechadas neste ciclo
+            weeks_in_cycle = self.storage.fetchall("""
+                SELECT week_start FROM ranking_rounds
+                WHERE state = 'closed'
+                ORDER BY week_start DESC
+                LIMIT 4
+            """)
+            # Se já temos 4 semanas fechadas e o ciclo ainda está ativo, fecha e inicia novo
+            if len(weeks_in_cycle) >= 4:
+                old_cycle_id = cycle["cycle_id"]
+                ano_mes = today[:7].replace("-", "")
+                new_cycle_id = f"cycle-{ano_mes}"
+                close_cycle_and_start_new(self.storage, old_cycle_id, new_cycle_id)
+                self.telegram.send_message(
+                    -1002267119439,
+                    f"*Novo ciclo iniciado:* `{new_cycle_id}`\n"
+                    "Rodizio de podio aplicado para o proximo mes.",
+                )
+
     def _dispatch_command(self, cmd: Command, user_id: Optional[int],
                           chat_id: Optional[int], args: Optional[str], msg: dict) -> None:
-        # Checagem de permissao
-        if cmd.owner_only and not self.permissions.is_owner(user_id or 0):
-            self.telegram.send_message(chat_id, "Comando restrito ao owner.")
-            return
-        if cmd.admin_only and not self.permissions.is_admin(user_id or 0):
-            self.telegram.send_message(chat_id, "Comando restrito a administradores.")
-            return
 
         # Cooldown para publico (no grupo). Admins/owner isentos.
         if cmd.public and chat_id and not self.permissions.is_admin(user_id or 0):
@@ -110,6 +178,7 @@ class RankingApp:
         while self._running:
             try:
                 updates = self.telegram.get_updates()
+                self._check_schedule()
                 for upd in updates:
                     uid = upd["update_id"]
                     # pula se ja foi processado (dedup apos reinicio/dupla entregada)
