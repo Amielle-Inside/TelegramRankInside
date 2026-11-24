@@ -108,13 +108,28 @@ class TelegramClient:
         return result
 
     # ---------------------- envios ---------------------- #
-    def send_message(self, chat_id: int | str, text: str, parse_mode: str = "Markdown") -> dict:
-        return self._post("sendMessage", {
-            "chat_id": chat_id,
-            "text": text,
-            "parse_mode": parse_mode,
-            "disable_web_page_preview": True,
-        })
+    def send_message(self, chat_id: int | str, text: str, parse_mode: str | None = "Markdown") -> dict:
+        try:
+            return self._post("sendMessage", {
+                "chat_id": chat_id,
+                "text": text,
+                "parse_mode": parse_mode,
+                "disable_web_page_preview": True,
+            })
+        except Exception as e:
+            # Se falhou por formacao Markdown invalida (HTTP 400), reenvia texto puro
+            if parse_mode is not None and "400" in str(e):
+                try:
+                    return self._post("sendMessage", {
+                        "chat_id": chat_id,
+                        "text": text,
+                        "disable_web_page_preview": True,
+                    })
+                except Exception as e2:
+                    print(f"[telegram] erro send_message (sem markdown): {e2}")
+                    raise
+            print(f"[telegram] erro send_message: {e}")
+            raise
 
     def send_private(self, user_id: int, text: str) -> dict:
         return self.send_message(user_id, text)

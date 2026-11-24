@@ -73,10 +73,12 @@ def _top10(storage: Storage, chat_id: int, week_start: str) -> list:
 
 
 def _cycle_info(storage: Storage, chat_id: int) -> dict:
-    # ciclo ativo
+    # ciclo ativo primeiro; se nao houver, o ultimo fechado
     row = storage.fetchone("SELECT * FROM ranking_cycles WHERE state = 'active' ORDER BY started_at DESC LIMIT 1")
     if not row:
-        return {"active": False}
+        row = storage.fetchone("SELECT * FROM ranking_cycles ORDER BY started_at DESC LIMIT 1")
+        if not row:
+            return {"active": False}
     import json
     participants = json.loads(row["participants"] or "[]")
     # pódios já conquistados neste ciclo
@@ -86,9 +88,10 @@ def _cycle_info(storage: Storage, chat_id: int) -> dict:
     """, (row["cycle_id"],))
     podium_map = {r["user_id"]: r["qtd"] for r in podiums}
     return {
-        "active": True,
+        "active": row["state"] == "active",
         "cycle_id": row["cycle_id"],
         "started_at": row["started_at"],
+        "state": row["state"],
         "participants": participants,
         "podiums": podium_map,
     }
@@ -117,11 +120,12 @@ def cmd_rciclo(app: RankingApp, user_id: Optional[int], chat_id: Optional[int],
         return
     storage: Storage = app.storage
     info = _cycle_info(storage, chat_id)
-    if not info.get("active"):
-        app.telegram.send_message(chat_id, "Nenhum ciclo ativo no momento.")
+    if not info.get("cycle_id"):
+        app.telegram.send_message(chat_id, "Nenhum ciclo encontrado.")
         return
+    estado = "ativo" if info.get("active") else "encerrado"
     termino = _ciclo_termino(info.get("started_at", ""), info["participants"])
-    lines = [f"*Ciclo:* `{info['cycle_id']}`"]
+    lines = [f"*Ciclo:* `{info['cycle_id']}` ({estado})"]
     lines.append(f"Iniciado em: {info.get('started_at', '—')}")
     lines.append(f"Término estimado: {termino}")
     lines.append(f"Participantes elegíveis: {len(info['participants'])}")
@@ -177,14 +181,15 @@ def cmd_historico(app: RankingApp, user_id: Optional[int], chat_id: Optional[int
     storage: Storage = app.storage
     rows = storage.fetchall("""
         SELECT week_start, state FROM ranking_rounds
-        WHERE state = 'closed' ORDER BY week_start DESC LIMIT 5
+        ORDER BY week_start DESC LIMIT 5
     """)
     if not rows:
-        app.telegram.send_message(chat_id, "Nenhuma rodada encerrada ainda.")
+        app.telegram.send_message(chat_id, "Nenhuma rodada encontrada.")
         return
-    lines = ["*Rodadas anteriores:*"]
+    lines = ["*Rodadas:*"]
     for r in rows:
-        lines.append(f"- {r['week_start']} ({r['state']})")
+        tag = "encerrada" if r["state"] == "closed" else "aberta"
+        lines.append(f"- {r['week_start']} ({tag})")
     app.telegram.send_message(chat_id, "\n".join(lines))
 
 
