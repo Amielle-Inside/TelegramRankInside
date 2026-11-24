@@ -13,10 +13,6 @@ from bot.core.commands import CommandRegistry, Command
 from bot.core.permissions import Permissions
 from bot.core.cooldowns import CooldownManager
 from bot.core.modules import ModuleManager, ModuleManifest
-from bot.modules.ranking.storage import (
-    week_start_for, sunday_end_for, ensure_week_round, close_week_round,
-    current_cycle, ensure_cycle, close_cycle_and_start_new,
-)
 
 
 class RankingApp:
@@ -77,18 +73,21 @@ class RankingApp:
 
     def _check_schedule(self) -> None:
         """Fecha rodada semanal (domingo 23:59 SP) e ciclo mensal (4 semanas)."""
-        now = time.time()
-        if now - self._last_schedule_check < 60:
-            return
-        self._last_schedule_check = now
-
+        from bot.modules.ranking.storage import (
+            week_start_for, close_week_round, current_cycle, close_cycle_and_start_new,
+        )
         from datetime import datetime, timezone, timedelta
         try:
             import zoneinfo
             tz = zoneinfo.ZoneInfo("America/Sao_Paulo")
         except Exception:
             tz = timezone(timedelta(hours=-3))
-        now_dt = datetime.fromtimestamp(now, tz=tz)
+
+        now_dt = datetime.fromtimestamp(time.time(), tz=tz)
+        now = time.time()
+        if now - self._last_schedule_check < 60:
+            return
+        self._last_schedule_check = now
         today = now_dt.strftime("%Y-%m-%d")
         today_weekday = now_dt.weekday()  # 0=segunda, 6=domingo
 
